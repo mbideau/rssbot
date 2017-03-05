@@ -90,6 +90,19 @@ smtp-ssl = True
 smtp-ssl-protocol = SSLv3
 ```
 
+### Sections explained
+
+- **imap** : The IMAP server hostname and port, to read from management messages. IMAP connection are always made with SSL.
+- **smtp** : The SMTP server hostname and port, to send management answer messages. SMTP connection are always made with SSL.
+- **account** : The credentials to connect with, to IMAP and SMTP (assuming they use the same)
+- **mailbox** : The inbox parameters, like the Inbox name in the IMAP server.
+- **message** : The outgoing management anwser message parameters, like the sender address and the subject's prefix
+- **rss2email** : The parameters to manage rss2email user directories and files
+- **service** : The service parameters, like its name and its language
+- **log** : The logging parameters
+- **DEFAULT** : The default configuration parameters that will be used by each user of rss2email
+
+
 ## Notes
 
 It uses logging as output, so adjust verbosity by adjusting the log level.

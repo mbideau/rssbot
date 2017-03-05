@@ -1,0 +1,17 @@
+fr:
+  error_no_subscription: "Votre email '%{email}' n'apparait pas dans la base de données du service %{service}.\nSi vous souhaitez vous inscrire, envoyez un mail avec en sujet '%{subscribe}'."
+  error_already_subscribed: "Votre email '%{email}' est déjà inscrit au service %{service}."
+  error_no_feed_found: "Impossible de trouver un flux (lien http) dans votre requête."
+  error_existing_feed: "Le flux '%{url}' est déjà présent."
+  error_no_existing_feed: "Le flux '%{url}' n'est pas présent."
+
+  action_new_subscription: "Nouvelle inscription enregistrée pour l'adresse email '%{email}'."
+  action_unsubscribed: "Votre email '%{email}' a été retiré de la liste des inscriptions et tous vos flux supprimés."
+  action_feed_added: "Flux '%{url}' ajouté."
+  action_feed_deleted: "Flux '%{url}' supprimé."
+
+  subscribe: inscription
+  unsubscribe: désinscription
+  add: ajouter
+  delete: supprimer
+  list: lister

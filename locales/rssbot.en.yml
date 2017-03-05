@@ -1,0 +1,18 @@
+en:
+  error_no_subscription: Your email '%{email}' doesn't exist in the %{service} serivce database.\nIf you want the subscribe, send a mail with subject '%{subscribe}'.
+  error_already_subscribed: Your email '%{email}' is already registered with the %{service} service.
+  error_no_feed_found: Failed to find a feed (http url) in your request.
+  error_existing_feed: The feed '%{url}' is already registered.
+  error_no_existing_feed: The feed '%{url}' is not registered.
+
+  action_new_subscription: New subscription added for email '%{email}'.
+  action_unsubscribed: Your email '%{email}' was removed from the subscriptions and all your feeds deleted.
+  action_feed_added: Feed '%{url}' added.
+  action_feed_deleted: Feed '%{url}' deleted.
+
+  subscribe: subscribe
+  unsubscribe: unsubscribe
+  add: add
+  delete: delete
+  list: list
+	

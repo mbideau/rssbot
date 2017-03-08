@@ -1,6 +1,10 @@
 # rssbot
 Convert RSS to email and manage users subscriptions and feeds through email messages.
 
+## Requirements
+A mailbox than can be connected to with an IMAP server (to read message) and SMTP server (to send message). Both servers needs to accept SSL connections.
+A server with python3 to install rssbot.
+
 ## Installation
 
 Clone the sources :
@@ -28,6 +32,32 @@ pip install python-i18n
 pip install pyyaml
 ```
 
+### (Optional) Patching rss2email
+
+In order to avoid failure when RSS feeds are protected with an invalid SSL certificate, you can disable SSL certificate verification by patching an rss2email file.
+
+Open the file :
+```
+rssbot/lib/python3.5/site-packages/rss2email/feed.py
+```
+_Replace `python3.5` by your python version._
+
+And add the following lines, after the last import line `from . import util as _util` :
+```
+# begin patch: disable SSL certificate verification
+# @see: http://stackoverflow.com/a/35960702
+import ssl
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    # Legacy Python that doesn't verify HTTPS certificates by default
+    pass
+else:
+    # Handle target environment that doesn't support HTTPS verification
+    ssl._create_default_https_context = _create_unverified_https_context
+# end patch
+```
+
 ## Usage
 
 Run `python3 rssbot.py`.
@@ -44,6 +74,21 @@ optional arguments:
   -h, --help     show this help message and exit
   -r, --run-all  Fetch and send all feeds of all users
 ```
+
+### Planed execution
+
+In order to fetch RSS feeds and send message, add the following command to your crontab (or like) :
+```
+python3 <path_to>/rssbot.py -r
+```
+I recommend planing it once a day, at night.
+
+To read and process management messages, add that to your crontab (or like) :
+```
+python3 <path_to>/rssbot.py
+```
+I recommend to plan it to every 15 minutes.
+
 
 ## Sample configuration
 
@@ -101,7 +146,6 @@ smtp-ssl-protocol = SSLv3
 - **service** : The service parameters, like its name and its language
 - **log** : The logging parameters
 - **DEFAULT** : The default configuration parameters that will be used by each user of rss2email
-
 
 ## Notes
 

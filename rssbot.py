@@ -27,6 +27,7 @@ if __name__ == '__main__':
 	)
 	parser.add_argument('config', metavar='CONFIG', help="The configuration file")
 	parser.add_argument('-r', '--run-all', dest='run_all', action='store_true', help="Fetch and send all feeds of all users")
+	parser.add_argument('-l', '--list-subjects', dest='list_subjects', action='store_true', help="List manamgent message predefined subjects/actions translated")
 	args = parser.parse_args()
 
 	if not os.path.isfile(args.config):
@@ -81,6 +82,21 @@ if __name__ == '__main__':
 						feeds.save()
 				else:
 					logging.debug("\t\tNo feed")
+
+	# list subjects
+	elif args.list_subjects:
+
+		# set config for processor module
+		processor.set_config(config)
+
+		# load translations and set locale
+		locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
+		processor.load_translations(locales_dir)
+		locale = config.get('service', 'lang')
+		processor.set_locale(locale)
+
+		print('\n'.join(map(lambda x: x.title(), processor.get_actions())))
+
 	
 	# management messages
 	else:

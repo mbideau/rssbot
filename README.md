@@ -71,9 +71,27 @@ positional arguments:
   CONFIG         The configuration file
 
 optional arguments:
-  -h, --help     show this help message and exit
-  -r, --run-all  Fetch and send all feeds of all users
+  -h, --help           show this help message and exit
+  -r, --run-all        Fetch and send all feeds of all users
+  -l, --list-subjects  List manamgent message predefined subjects/actions translated
+
 ```
+
+### Management messages
+
+To manage users subscription and feeds, you send email message with a specific syntax.
+Basically, you use a predefined subject, and a feed url in the mail body.
+Predefined subjects are :
+
+- **Subscribe** : the user subscribe to the service, its email is registered.
+- **Unsubscribe** : the user unsubscribe to the service, all its feeds are deleted.
+- **Add** : the user add a feed to its collection. The feed url must be given in the mail body.
+- **Delete** : the user delete a feed to its collection. The feed url must be given in the mail body.
+- **List** : the user list its feeds collection.
+
+Every subject is translated according to the 'lang' parameter defined in the configuration file.   
+The translations files must exists in `locales/rssbot.<locale>.yml`.  
+To list the available subjects/actions in the choosen language, run `python 3 rssbot.py -l`.
 
 ### Planed execution
 

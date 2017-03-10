@@ -63,7 +63,7 @@ else:
 Run `python3 rssbot.py`.
 
 ```
-usage: rssbot.py [-h] [-r] CONFIG
+usage: rssbot.py [-h] [-r] [-l] CONFIG
 
 Convert RSS to email and manage users subscriptions and feeds through email messages.
 
@@ -79,8 +79,8 @@ optional arguments:
 
 ### Management messages
 
-To manage users subscription and feeds, you send email message with a specific syntax.
-Basically, you use a predefined subject, and a feed url in the mail body.
+To manage users subscription and feeds, you send email message to the IMAP mailbox with a specific syntax.
+Basically, you use a predefined subject, and, if required, a feed url in the mail body.
 Predefined subjects are :
 
 - **Subscribe** : the user subscribe to the service, its email is registered.

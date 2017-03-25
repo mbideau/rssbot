@@ -108,8 +108,8 @@ def get_feed_from_content(content, html=False):
 		soup = BeautifulSoup('\n'.join(lines), 'html.parser')
 		links = soup.find_all('a')
 		for l in links:
-			if re.match('^https?://[^         ]+$', l, re.IGNORECASE):
-				feed = l
+			if re.match('^https?://[^         ]+$', str(l['href']), re.IGNORECASE):
+				feed = str(l['href'])
 				break
 
 	if not html or not feed:

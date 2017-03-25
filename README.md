@@ -140,8 +140,8 @@ name = rss2email
 lang = fr
 
 [log]
-level = DEBUG
-format = %%(levelname)-8s %%(message)s
+level = INFO
+format = %%(asctime)-15s %%(levelname)-8s %%(message)s
 
 [DEFAULT]
 email-protocol = smtp

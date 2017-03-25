@@ -41,14 +41,15 @@ if __name__ == '__main__':
 	# set the log level and log format accordingly
 	log_level = config.get('log', 'level').upper()
 	log_format = config.get('log', 'format')
+	log_stream = sys.stdout
 	if log_level == 'DEBUG':
-		logging.basicConfig(level=logging.DEBUG,format=log_format)
+		logging.basicConfig(stream=log_stream, level=logging.DEBUG,   format=log_format)
 	elif log_level == 'INFO':
-		logging.basicConfig(level=logging.INFO,format=log_format)
+		logging.basicConfig(stream=log_stream, level=logging.INFO,    format=log_format)
 	elif log_level == 'WARNING':
-		logging.basicConfig(level=logging.WARNING,format=log_format)
+		logging.basicConfig(stream=log_stream, level=logging.WARNING, format=log_format)
 	elif log_level == 'ERROR':
-		logging.basicConfig(level=logging.ERROR,format=log_format)
+		logging.basicConfig(stream=log_stream, level=logging.ERROR,   format=log_format)
 	else:
 		sys.stderr.write("[ERROR] Invalid log level '" + log_level + "'\n")
 		exit(2)
@@ -56,13 +57,14 @@ if __name__ == '__main__':
 	# fetch and send
 	if args.run_all:
 
+		logging.info("Fetching and sending feeds for each users ...")
 		# for each user's dir
 		data_dir = config.get('rss2email', 'data_dir')
 		logging.debug("From data dir: '%s'", data_dir)
 		for d in os.listdir(data_dir):
 			d_path = os.path.join(data_dir, d)
 			if os.path.isdir(d_path) and '@' in d:
-				logging.debug("\tUser: %s", d)
+				logging.info("\tUser: %s", d)
 				data_file = os.path.join(d_path, config.get('rss2email', 'data_filename'))
 				config_file = os.path.join(d_path, config.get('rss2email', 'configuration_filename'))
 				# run each feed (fetch then send)
@@ -73,7 +75,7 @@ if __name__ == '__main__':
 						for feed in feeds:
 							if feed.active:
 								try:
-									logging.debug("\t\tFeed: %s", feed.name)
+									logging.info("\t\tFeed: %s", feed.name)
 									feed.run(send=True)
 								except _error.RSS2EmailError as e:
 									e.log()
@@ -100,6 +102,8 @@ if __name__ == '__main__':
 	
 	# management messages
 	else:
+
+		logging.info("Processing management messages ...")
 
 		# get connection parameters
 		hostname =   config.get('imap', 'hostname')

@@ -66,11 +66,8 @@ def process_message(msg):
 	subject = str(email.header.make_header(email.header.decode_header(msg['Subject'])))
 	# body
 	body = msg['Body']
-	logging.debug('\t%s', subject)
-	logging.debug('\t\t%s -> %s', from_who, to_who)
-	logging.debug('\t\tDate: %s', msg_date)
 	feed = extract_feed_url_from_body(msg)
-	logging.debug('\t\tFeed: %s', feed)
+	logging.info('< [%s] %s %s %s', msg_date, from_who, subject, ('(' + feed + ')' if feed else ''))
 	return process_rss2email(from_who, subject.strip().lower(), feed)
 
 
@@ -146,55 +143,72 @@ def process_rss2email(email, action, url):
 	subject = get_config().get('message', 'subject_prefix') + " Re: " + action.title()
 
 	if not re.match('^[ 	]*(' + '|'.join(get_actions()) + ')[ 	]*$', action, re.IGNORECASE):
-		logging.debug("\t\tInvalid action '%s'. Skipping.", action)
+		logging.info("\t\tInvalid action '%s'. Skipping.", action)
 		logging.debug("\t\tAllowed actions in lang '%s': %s", i18n.get('locale'), ', '.join(get_actions()))
 		return True
 
 	has_subscription = rss2email_has_subscriptions(email)
 	if not has_subscription and action != i18n.t('rssbot.subscribe'):
-		send_mail(email, subject, i18n.t('rssbot.error_no_subscription',
+		response = i18n.t('rssbot.error_no_subscription',
 			email=email, service=get_config().get('service', 'name'), subscribe=i18n.t('rssbot.subscribe')
-		))
+		)
+		send_mail(email, subject, response)
+		logging.info("> %s", response)
 		return True
 
 	if i18n.t('rssbot.subscribe') == action:
 		if has_subscription:
-			send_mail(email, subject, i18n.t('rssbot.error_already_subscribed',
+			response = i18n.t('rssbot.error_already_subscribed',
 				email=email, service=get_config().get('service', 'name')
-			))
+			)
+			send_mail(email, subject, response)
+			logging.info("> %s", response)
 		else:
 			output = rss2email_new_subscription(email)
 			send_mail(email, subject, output)
+			logging.info("> %s", output)
 
 	elif i18n.t('rssbot.unsubscribe') == action:
 		output = rss2email_remove_subscription(email)
 		send_mail(email, subject, output)
+		logging.info("> %s", output)
 
 	elif i18n.t('rssbot.add') == action:
 		if not url:
-			send_mail(email, subject, i18n.t('rssbot.error_no_feed_found'))
+			response = i18n.t('rssbot.error_no_feed_found')
+			send_mail(email, subject, response)
+			logging.info("> %s", response)
 		elif rss2email_get_feed_index(email, url) is not None:
-			send_mail(email, subject, i18n.t('rssbot.error_existing_feed', url=url))
+			response = i18n.t('rssbot.error_existing_feed', url=url)
+			send_mail(email, subject, response)
+			logging.info("> %s", response)
 		else:
 			output = rss2email_add_feed(email, url)
 			send_mail(email, subject, output)
+			logging.info("> %s", output)
 
 	elif i18n.t('rssbot.delete') == action:
 		if not url:
-			send_mail(email, subject, i18n.t('rssbot.error_no_feed_found'))
+			response = i18n.t('rssbot.error_no_feed_found')
+			send_mail(email, subject, response)
+			logging.info("> %s", response)
 		else:
 			feed_index = rss2email_get_feed_index(email, url)
 			if not feed_index:
-				send_mail(email, subject, i18n.t('rssbot.error_no_existing_feed', url=url))
+				response = i18n.t('rssbot.error_no_existing_feed', url=url)
+				send_mail(email, subject, response)
+				logging.info("> %s", response)
 			else:
 				output = rss2email_remove_feed(email, feed_index)
 				send_mail(email, subject, output)
+				logging.info("> %s", output)
 
 	elif i18n.t('rssbot.list') == action:
 		output = rss2email_list_feeds(email)
 		send_mail(email, subject, output)
+		logging.info("> (list of feeds)")
 	else:
-		logging.debug("\tInvalid action '%s'. Skipping.", action)
+		logging.info("\tInvalid action '%s'. Skipping.", action)
 	return True
 
 

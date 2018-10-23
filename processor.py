@@ -199,7 +199,7 @@ def process_rss2email(email, action, url):
 				send_mail(email, subject, response)
 				logging.info("> %s", response)
 			else:
-				output = rss2email_remove_feed(email, feed_index)
+				output = rss2email_delete_feed(email, feed_index)
 				send_mail(email, subject, output)
 				logging.info("> %s", output)
 

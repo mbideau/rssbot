@@ -98,8 +98,11 @@ if __name__ == '__main__':
 								try:
 									logging.info("\t\tFeed: %s", feed.name)
 									feed.run(send=True)
-								except _error.RSS2EmailError as e:
-									e.log()
+								#except _error.RSS2EmailError as e:
+								#	e.log()
+								except Exception as exception:
+									logging.error("\t\tCatched an '%s' exception (fetching feed aborted): %s",
+												  type(exception).__name__, exception)
 					finally:
 						logging.info("\t\tSaving feeds ...")
 						feeds.save()

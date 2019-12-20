@@ -9,27 +9,22 @@ A server with python3 to install rssbot.
 
 Clone the sources :
 ```
-git clone https://github.com/mbideau/rssbot.git rssbot
+~> git clone https://github.com/mbideau/rssbot.git rssbot
 ```
 
-Install packages requirements :
+Install packages requirements (on _Ubuntu_/_Debian_):
 ```
-apt install --no-install-recommends python3-pip
+~> apt install --no-install-recommends python3-pip
 ```
 
 Create a python virtual environment :
 ```
-python3 -m venv rssbot
+~> python3 -m venv rssbot
 ```
 
 Install required python dependencies :
 ```
-pip install rss2email
-pip install html2text
-pip install feedparser
-pip install beautifulsoup4
-pip install python-i18n
-pip install pyyaml
+~> rssbot/bin/pip install rss2email html2text feedparser beautifulsoup4 python-i18n pyyaml
 ```
 
 ### (Optional) Patching rss2email
@@ -60,21 +55,24 @@ else:
 
 ## Usage
 
-Run `python3 rssbot.py`.
+Run `rssbot/bin/python rssbot/rssbot.py --help`.
 
 ```
-usage: rssbot.py [-h] [-r] [-l] CONFIG
+usage: rssbot.py [-h] [-m] [-u USER] [-a] [-l] CONFIG
 
-Convert RSS to email and manage users subscriptions and feeds through email messages.
+Convert RSS to email and manage users subscriptions and feeds through email
+messages.
 
 positional arguments:
-  CONFIG         The configuration file
+  CONFIG                The configuration file
 
 optional arguments:
-  -h, --help           show this help message and exit
-  -r, --run-all        Fetch and send all feeds of all users
-  -l, --list-subjects  List manamgent message predefined subjects/actions translated
-
+  -h, --help            show this help message and exit
+  -m, --manage          Manage subscription of users
+  -u USER, --user USER  Fetch and send all feeds of specified user
+  -a, --fetch-all       Fetch and send all feeds of all users
+  -l, --list-subjects   List managment message predefined subjects/actions
+                        translated
 ```
 
 ### Management messages
@@ -97,13 +95,13 @@ To list the available subjects/actions in the choosen language, run `python 3 rs
 
 In order to fetch RSS feeds and send message, add the following command to your crontab (or like) :
 ```
-python3 <path_to>/rssbot.py -r
+rssbot/bin/python rssbot/rssbot.py --fetch-all
 ```
 I recommend planing it once a day, at night.
 
 To read and process management messages, add that to your crontab (or like) :
 ```
-python3 <path_to>/rssbot.py
+rssbot/bin/python rssbot/rssbot.py --manage
 ```
 I recommend to plan it to every 15 minutes.
 
@@ -138,19 +136,22 @@ data_filename = data.json
 [service]
 name = rss2email
 lang = fr
+admin = admin@example.net
 
 [log]
 level = INFO
-format = %%(asctime)-15s %%(levelname)-8s %%(message)s
+format = %%(asctime)-15s    %%(levelname)-8s %%(message)s
 
 [DEFAULT]
+html-mail = True
+use-css = True
 email-protocol = smtp
 smtp-auth = True
 smtp-username = rssbot@example.net
 smtp-password = s3cr3tp4ssWd
 smtp-server = mail.gandi.net:465
 smtp-ssl = True
-smtp-ssl-protocol = SSLv3
+;smtp-ssl-protocol = SSLv3 ; not supported since rss2email v3.9.10
 ```
 
 ### Sections explained
@@ -161,7 +162,7 @@ smtp-ssl-protocol = SSLv3
 - **mailbox** : The inbox parameters, like the Inbox name in the IMAP server.
 - **message** : The outgoing management anwser message parameters, like the sender address and the subject's prefix
 - **rss2email** : The parameters to manage rss2email user directories and files
-- **service** : The service parameters, like its name and its language
+- **service** : The service parameters, like its name, its language and its administrator contact
 - **log** : The logging parameters
 - **DEFAULT** : The default configuration parameters that will be used by each user of rss2email
 

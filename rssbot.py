@@ -26,8 +26,10 @@ if __name__ == '__main__':
 		description="Convert RSS to email and manage users subscriptions and feeds through email messages."
 	)
 	parser.add_argument('config', metavar='CONFIG', help="The configuration file")
-	parser.add_argument('-r', '--run-all', dest='run_all', action='store_true', help="Fetch and send all feeds of all users")
-	parser.add_argument('-l', '--list-subjects', dest='list_subjects', action='store_true', help="List manamgent message predefined subjects/actions translated")
+	parser.add_argument('-m', '--manage', dest='manage', action='store_true', help="Manage subscription of users")
+	parser.add_argument('-u', '--user', dest='user', help="Fetch and send all feeds of specified user")
+	parser.add_argument('-a', '--fetch-all', dest='fetch_all', action='store_true', help="Fetch and send all feeds of all users")
+	parser.add_argument('-l', '--list-subjects', dest='list_subjects', action='store_true', help="List managment message predefined subjects/actions translated")
 	args = parser.parse_args()
 
 	if not os.path.isfile(args.config):
@@ -55,18 +57,37 @@ if __name__ == '__main__':
 		exit(2)
 
 	# fetch and send
-	if args.run_all:
+	if args.fetch_all or args.user:
 
-		logging.info("Fetching and sending feeds for each users ...")
-		# for each user's dir
+		logging.info("Fetching and sending feeds ...")
+		users = {}
+
 		data_dir = config.get('rss2email', 'data_dir')
 		logging.debug("From data dir: '%s'", data_dir)
-		for d in os.listdir(data_dir):
-			d_path = os.path.join(data_dir, d)
-			if os.path.isdir(d_path) and '@' in d:
-				logging.info("\tUser: %s", d)
-				data_file = os.path.join(d_path, config.get('rss2email', 'data_filename'))
-				config_file = os.path.join(d_path, config.get('rss2email', 'configuration_filename'))
+
+		# all users
+		if args.fetch_all:
+
+			# for each user's dir
+			for d in os.listdir(data_dir):
+				d_path = os.path.join(data_dir, d)
+				if os.path.isdir(d_path) and '@' in d:
+					users[d] = d_path
+
+		# one user
+		if args.user:
+
+			d_path = os.path.join(data_dir, args.user)
+			if os.path.isdir(d_path) and '@' in args.user:
+				users[args.user] = d_path
+			else:
+				logging.info("User '%s' not found", args.user)
+
+		# for each user
+		for user, udir in users.items():
+				logging.info("\tUser: %s (%s)", user, udir)
+				data_file = os.path.join(udir, config.get('rss2email', 'data_filename'))
+				config_file = os.path.join(udir, config.get('rss2email', 'configuration_filename'))
 				# run each feed (fetch then send)
 				feeds = _feeds.Feeds(datafile=data_file, configfiles=[config_file])
 				feeds.load(lock=True)
@@ -80,10 +101,10 @@ if __name__ == '__main__':
 								except _error.RSS2EmailError as e:
 									e.log()
 					finally:
-						logging.debug("\t\tSaving...")
+						logging.info("\t\tSaving feeds ...")
 						feeds.save()
 				else:
-					logging.debug("\t\tNo feed")
+					logging.info("\t\tNo feed")
 
 	# list subjects
 	elif args.list_subjects:
@@ -101,7 +122,7 @@ if __name__ == '__main__':
 
 	
 	# management messages
-	else:
+	elif args.manage:
 
 		logging.info("Processing management messages ...")
 
@@ -118,34 +139,44 @@ if __name__ == '__main__':
 			logging.error("Failed to login to '%s:%s' with user '%s'", hostname, port, username)
 			sys.exit(1)
 
+		# select mailbox
+		rv, data = imap_conn.select(inbox_name)
+		if rv != 'OK':
+			logging.error("Failed to selecting INBOX '%s'", inbox_name)
+			imap_conn.close()
+			sys.exit(1)
+
+		# set config for processor module
+		processor.set_config(config)
+
+		# open smtp connection
+		processor.init_smtp()
+
+		# load translations and set locale
+		locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
+		processor.load_translations(locales_dir)
+		locale = config.get('service', 'lang')
+		processor.set_locale(locale)
+
+		# process messages
+		logging.debug("Processing mailbox ...")
+
 		try:
-			# select mailbox
-			rv, data = imap_conn.select(inbox_name)
-			if rv != 'OK':
-				logging.error("Failed to selecting INBOX '%s'", inbox_name)
-				imap_conn.close()
-				sys.exit(1)
 
-			# set config for processor module
-			processor.set_config(config)
-
-			# open smtp connection
-			processor.init_smtp()
-
-			# load translations and set locale
-			locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
-			processor.load_translations(locales_dir)
-			locale = config.get('service', 'lang')
-			processor.set_locale(locale)
-
-			# process messages
-			logging.debug("Processing mailbox ...")
+			num = None
+			msg = None
 			for num, msg in imap_reader.get_messages(imap_conn):
-				if processor.process_message(msg):
+				result = processor.process_message(msg)
+				if result:
 					imap_reader.mark_msg_as_read(imap_conn, num)
 				else:
 					imap_reader.mark_msg_as_not_read(imap_conn, num)
 				#imap_reader.mark_msg_as_not_read(imap_conn, num)
+
+		except Exception as exception:
+			processor.handle_error(exception, msg, result)
+
+		finally:
 
 			# closing mailbox
 			logging.debug("Closing IMAP mailbox ...")
@@ -153,9 +184,12 @@ if __name__ == '__main__':
 
 			# close smtp connection
 			processor.close_smtp()
-			
 
-		finally:
 			logging.debug("Logging out IMAP")
 			imap_conn.logout()
 
+	# no argument
+	else:
+
+		# display help message
+		parser.print_help()

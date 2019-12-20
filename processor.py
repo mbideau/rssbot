@@ -365,6 +365,10 @@ def rss2email_new_subscription(email):
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
                   email)
+	if number_of_feeds:
+		raise RuntimeError(
+			"There should be no feed for a new subscription ! "
+			"Got '%s' for user '%s'" % (number_of_feeds, email))
 	feeds.config['DEFAULT']['to'] = email
 	feeds.config['DEFAULT']['from'] = get_config().get('message', 'from')
 	for k, v in get_config()['DEFAULT'].items():

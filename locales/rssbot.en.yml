@@ -1,14 +1,17 @@
 en:
-  error_no_subscription: Your email '%{email}' doesn't exist in the %{service} serivce database.\nIf you want the subscribe, send a mail with subject '%{subscribe}'.
-  error_already_subscribed: Your email '%{email}' is already registered with the %{service} service.
-  error_no_feed_found: Failed to find a feed (http url) in your request.
-  error_existing_feed: The feed '%{url}' is already registered.
-  error_no_existing_feed: The feed '%{url}' is not registered.
+  error_no_subscription: "Your email '%{email}' doesn't exist in the %{service} serivce database.\nIf you want the subscribe, send a mail with subject '%{subscribe}'."
+  error_already_subscribed: "Your email '%{email}' is already registered with the %{service} service."
+  error_no_feed_found: "Failed to find a feed (http url) in your request."
+  error_existing_feed: "The feed '%{url}' is already registered."
+  error_no_existing_feed: "The feed '%{url}' is not registered."
+  error_exception: "An '%{error}' error happened while processing message '%{message}'.\nPlease try again or contact '%{admin}'."
+  error_exception_fallback: "An error happened while processing the message below.\nPlease try again or contact '%{admin}'.\n\nMessage:\n---\n%{message}\n---\n"
 
-  action_new_subscription: New subscription added for email '%{email}'.
-  action_unsubscribed: Your email '%{email}' was removed from the subscriptions and all your feeds deleted.
-  action_feed_added: Feed '%{url}' added.
-  action_feed_deleted: Feed '%{url}' deleted.
+  action_new_subscription: "New subscription added for email '%{email}'."
+  action_unsubscribed: "Your email '%{email}' was removed from the subscriptions and all your feeds deleted."
+  action_feed_added: "Feed '%{url}' added."
+  action_feed_add_failed: "Failed to add feed '%{url}' :-("
+  action_feed_deleted: "Feed '%{url}' deleted."
 
   subscribe: subscribe
   unsubscribe: unsubscribe

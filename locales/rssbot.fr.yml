@@ -4,10 +4,13 @@ fr:
   error_no_feed_found: "Impossible de trouver un flux (lien http) dans votre requête."
   error_existing_feed: "Le flux '%{url}' est déjà présent."
   error_no_existing_feed: "Le flux '%{url}' n'est pas présent."
+  error_exception: "Une erreur '%{error}' est survenue pendant le traitement du message '%{message}'.\nS'il vous plait, essayez à nouveau ou contactez '%{admin}'."
+  error_exception_fallback: "Une erreur est survenue pendant le traitement du message ci-dessous.\nS'il vous plait, essayez à nouveau ou contactez '%{admin}'.\n\nMessage:\n---\n%{message}\n---\n"
 
   action_new_subscription: "Nouvelle inscription enregistrée pour l'adresse email '%{email}'."
   action_unsubscribed: "Votre email '%{email}' a été retiré de la liste des inscriptions et tous vos flux supprimés."
   action_feed_added: "Flux '%{url}' ajouté."
+  action_feed_add_failed: "Échec de l'ajout du flux '%{url}' :-("
   action_feed_deleted: "Flux '%{url}' supprimé."
 
   subscribe: inscription

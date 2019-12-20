@@ -11,9 +11,25 @@ import smtplib
 from os import makedirs
 from os.path import join, isfile, isdir
 import shutil
+from rss2email import feed as _feed
 from rss2email import feeds as _feeds
 from bs4 import BeautifulSoup
 import i18n
+
+# BEGIN -- import for function 'check_for_feed_errors'
+# copy pasted from rss2email/feed.py
+import socket as _socket
+_SOCKET_ERRORS = []
+for e in ['error', 'herror', 'gaierror']:
+	if hasattr(_socket, e):
+		_SOCKET_ERRORS.append(getattr(_socket, e))
+del e  # cleanup namespace
+_SOCKET_ERRORS = tuple(_SOCKET_ERRORS)
+import xml.sax as _sax
+import feedparser as _feedparser
+_feedparser.PREFERRED_XML_PARSERS = []
+# END -- import for function 'check_for_feed_errors'
+
 
 REGEX_EMAIL_WITH_NAME = re.compile('^ *"?[^"]+"? *<(?P<email>[^>]+)> *$')
 
@@ -41,7 +57,7 @@ def handle_error(exception, msg, result):
 			subject = get_config().get('message', 'subject_prefix') + " Error"
 			response = i18n.t('rssbot.error_exception_fallback',
 							  admin=get_config().get('service', 'admin'),
-                              message=str(msg))
+							  message=str(msg))
 		except Exception as inner_inner_exception:
 			logging.error("Catched an inner inner exception: %s", inner_inner_exception)
 
@@ -110,12 +126,70 @@ def parse_message(msg):
 	feed = extract_feed_url_from_body(msg)
 	action = subject.strip().lower()
 	return msg_date, from_who, subject, action, feed
-	
+
 
 def process_message(msg):
 	msg_date, from_who, subject, action, feed = parse_message(msg)
 	logging.info('< [%s] %s %s %s', msg_date, from_who, subject, ('(' + feed + ')' if feed else ''))
 	return process_rss2email(from_who, action, feed)
+
+
+# a near copy-paste from rss2email/feed.py
+# instead of logging notices, warnings and errors, it returns them
+def check_for_feed_errors(parsed):
+	notices = []
+	warnings = []
+	errors = []
+
+	status = getattr(parsed, 'status', 200)
+	if status not in [200, 301, 302, 304, 307]:
+		errors.append("HTTP status is not okay (status=%s)" % status)
+
+	http_headers = parsed.get('headers', {})
+	if not http_headers:
+		warnings.append('could not get HTTP headers')
+	else:
+		if 'html' in http_headers.get('content-type', 'rss'):
+			warnings.append('looks like HTML')
+		if http_headers.get('content-length', '1') == '0':
+			warnings.append('empty page')
+
+	version = parsed.get('version', None)
+	if not version:
+		notices.append('unrecognized version')
+
+	exc = parsed.get('bozo_exception', None)
+	if isinstance(exc, _socket.timeout):
+		errors.append('timed out')
+	elif isinstance(exc, OSError):
+		errors.append(str(exc))
+	elif isinstance(exc, _SOCKET_ERRORS):
+		errors.append(str(exc))
+	elif isinstance(exc, _feedparser.zlib.error):
+		errors.append('broken compression')
+	elif isinstance(exc, (IOError, AttributeError)):
+		errors.append(str(exc))
+	elif isinstance(exc, KeyboardInterrupt):
+		raise exc
+	elif isinstance(exc, _sax.SAXParseException):
+		errors.append('sax parsing error: {}'.format(exc))
+	elif (parsed.bozo and
+		  isinstance(exc, _feedparser.CharacterEncodingOverride)):
+		warnings.append(
+			'incorrectly declared encoding: {}'.format(exc))
+	elif (parsed.bozo and isinstance(exc, _feedparser.NonXMLContentType)):
+		warnings.append('non XML Content-Type: {}'.format(exc))
+	elif parsed.bozo or exc:
+		if exc is None:
+			exc = "can't process"
+		errors.append('processing error: {}'.format(exc))
+
+	if (status in [200, 302] and
+		not parsed.entries and
+		not version):
+		errors.append('processing error')
+
+	return notices, warnings, errors
 
 
 def extract_feed_url_from_body(msg):
@@ -169,7 +243,7 @@ def get_feed_from_content(content, html=False):
 		soup = BeautifulSoup('\n'.join(lines), 'html.parser')
 		links = soup.find_all('a')
 		for l in links:
-			if re.match('^https?://[^         ]+$', str(l['href']), re.IGNORECASE):
+			if re.match('^https?://[^ 	]+$', str(l['href']), re.IGNORECASE):
 				feed = str(l['href'])
 				break
 
@@ -182,40 +256,40 @@ def get_feed_from_content(content, html=False):
 				if isinstance(found, list):
 					feed = found[0]
 				break
-			
+
 	return feed.strip() if feed else None
 
 
 def get_feed_name_from_url(url):
-    if not re.match(r'^https?://([^/]+)/?.*$', url):
-        return None
+	if not re.match(r'^https?://([^/]+)/?.*$', url):
+		return None
 
-    domain = re.sub(r'^https?://([^/]+)/?.*$', '\\1', url)
-    slashes = url.count('/')
-    if slashes <= 2 or (slashes == 3 and url[-1] == '/'):
-        return domain
+	domain = re.sub(r'^https?://([^/]+)/?.*$', '\\1', url)
+	slashes = url.count('/')
+	if slashes <= 2 or (slashes == 3 and url[-1] == '/'):
+		return domain
 
-    url_noparams = url
-    params = None
+	url_noparams = url
+	params = None
 
-    if url.find('?') != -1:
-        params = re.sub(r'^.*/.*(\?.*)$', '\\1', url)
+	if url.find('?') != -1:
+		params = re.sub(r'^.*/.*(\?.*)$', '\\1', url)
 
-        if params is not None and len(params) > 0:
-            url_noparams = re.sub(r'^(.*/.*)\?.*$', '\\1', url)
+		if params is not None and len(params) > 0:
+			url_noparams = re.sub(r'^(.*/.*)\?.*$', '\\1', url)
 
-    last_alphanum_part = re.sub(r'^.*/([0-9a-zA-Z]+)(\.(xml|feed|atom|rss|php))?/?$', '\\1', url_noparams)
-    if params is None or len(params) <= 0:
-        return domain + '--' + last_alphanum_part
+	last_alphanum_part = re.sub(r'^.*/([0-9a-zA-Z]+)(\.(xml|feed|atom|rss|php))?/?$', '\\1', url_noparams)
+	if params is None or len(params) <= 0:
+		return domain + '--' + last_alphanum_part
 
-    params_kv = params[1:].split('&')
-    params_text = []
-    for kv in params_kv:
-        if kv.find('=') == -1:
-            params_text.append(kv)
-        else:
-            params_text.append(kv.split('=')[1])
-    return domain + '--' + last_alphanum_part + '--' + '--'.join(params_text)
+	params_kv = params[1:].split('&')
+	params_text = []
+	for kv in params_kv:
+		if kv.find('=') == -1:
+			params_text.append(kv)
+		else:
+			params_text.append(kv.split('=')[1])
+	return domain + '--' + last_alphanum_part + '--' + '--'.join(params_text)
 
 
 
@@ -312,7 +386,7 @@ def init_smtp():
 	global SMTP_CONNECTION
 	if not SMTP_CONNECTION:
 		hostname = get_config().get('smtp', 'hostname')
-		port 	 = get_config().get('smtp', 'port')
+		port     = get_config().get('smtp', 'port')
 		username = get_config().get('account', 'username')
 		password = get_config().get('account', 'password')
 		try:
@@ -364,7 +438,7 @@ def rss2email_new_subscription(email):
 				  'are' if number_of_feeds > 1 else 'is',
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
-                  email)
+				  email)
 	if number_of_feeds:
 		raise RuntimeError(
 			"There should be no feed for a new subscription ! "
@@ -390,14 +464,42 @@ def rss2email_add_feed(email, url):
 	if not name:
 		logging.error("\t\tFailed to get feed name for feed '%s'", url)
 		return i18n.t('rssbot.action_feed_add_failed', url=url)
+
+	try:
+		logging.debug("\t\tCreating a temporary feed (name=%s, url=%s)",
+					  name, url[:30] + ('…' if len(url) > 30 else ''))
+		temp_feed = _feed.Feed(name=name, url=url)
+		logging.debug("\t\tFetching the feed")
+		parsed = temp_feed._fetch()
+		logging.debug("\t\tChecking for errors")
+		notices, warnings, errors = check_for_feed_errors(parsed)
+	except Exception as exception:
+		logging.error("\t\tFeed produced a '%s' exception: %s",
+					  type(exception).__name__, exception)
+		return i18n.t('rssbot.action_feed_add_failed', url=url)
+
+	if notices:
+		for notice in notices:
+			logging.debug("\t\tFeed NOTICE: %s", notice)
+	if warnings:
+		for warning in warnings:
+			logging.debug("\t\tFeed WARNING: %s", warning)
+	if errors:
+		for error in errors:
+			logging.debug("\t\tFeed ERROR: %s", error)
+	if warnings or errors:
+		logging.debug("\t\tFeed '%s' is not valid. Not adding it.", url)
+		return i18n.t('rssbot.action_feed_add_refused', url=url)
+
 	logging.debug("\t\tAdding feed '%s' (%s) for '%s'", name, url, email)
+	temp_feed = None
 	feeds = get_feeds(email)
 	number_of_feeds = len(feeds)
 	logging.debug("\t\tCurrently there %s %d feed%s for '%s'",
 				  'are' if number_of_feeds > 1 else 'is',
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
-                  email)
+				  email)
 	feeds.load(lock=True)
 	logging.debug("\t\tSuccessfully loaded feeds (lock=True)")
 	feed = feeds.new_feed(name=name, url=url, to=email)
@@ -409,7 +511,7 @@ def rss2email_add_feed(email, url):
 				  'are' if number_of_feeds > 1 else 'is',
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
-                  email)
+				  email)
 	logging.debug("\t\tFeeds saved for '%s'", email)
 	return i18n.t('rssbot.action_feed_added', url=url)
 
@@ -422,7 +524,7 @@ def rss2email_delete_feed(email, index):
 				  'are' if number_of_feeds > 1 else 'is',
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
-                  email)
+				  email)
 	feeds.load(lock=True)
 	logging.debug("\t\tSuccessfully loaded feeds (lock=True)")
 	feed = feeds.index(index)
@@ -435,7 +537,7 @@ def rss2email_delete_feed(email, index):
 				  'are' if number_of_feeds > 1 else 'is',
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
-                  email)
+				  email)
 	logging.debug("\t\tFeeds saved for '%s'", email)
 	return i18n.t('rssbot.action_feed_deleted', url=feed.url)
 
@@ -452,7 +554,7 @@ def rss2email_list_feeds(email):
 			active_char = ' '
 		output.append('{}: [{}] {} ({})'.format(i, active_char, feed.name, feed.url))
 	return '\n'.join(output)
-	
+
 
 def rss2email_get_feed_index(email, url):
 	feeds = get_feeds(email)

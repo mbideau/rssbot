@@ -10,6 +10,7 @@ import re
 import processor
 import imap_reader
 import argparse
+from rss2email import config as _config
 from rss2email import feeds as _feeds
 from rss2email import error as _error
 
@@ -88,24 +89,26 @@ if __name__ == '__main__':
 				logging.info("\tUser: %s (%s)", user, udir)
 				data_file = os.path.join(udir, config.get('rss2email', 'data_filename'))
 				config_file = os.path.join(udir, config.get('rss2email', 'configuration_filename'))
+				feeds_config = _config.Config()
+				feeds_config['DEFAULT'] = _config.CONFIG['DEFAULT']
 				# run each feed (fetch then send)
-				feeds = _feeds.Feeds(datafile=data_file, configfiles=[config_file])
+				feeds = _feeds.Feeds(datafile=data_file, configfiles=[config_file], config=feeds_config)
+				logging.debug("\t\tLoading feeds ...")
 				feeds.load(lock=True)
 				if feeds:
-					try:
-						for feed in feeds:
-							if feed.active:
-								try:
-									logging.info("\t\tFeed: %s", feed.name)
-									feed.run(send=True)
-								#except _error.RSS2EmailError as e:
-								#	e.log()
-								except Exception as exception:
-									logging.error("\t\tCatched an '%s' exception (fetching feed aborted): %s",
-												  type(exception).__name__, exception)
-					finally:
-						logging.info("\t\tSaving feeds ...")
-						feeds.save()
+					logging.debug("\t\t%d feeds to fetch ...", len(feeds))
+					for feed in feeds:
+						if feed.active:
+							try:
+								logging.info("\t\tFetching: %s", feed.name)
+								feed.run(send=True)
+							#except _error.RSS2EmailError as e:
+							#	e.log()
+							except Exception as exception:
+								logging.error("\t\tCatched an '%s' exception (fetching feed aborted): %s",
+											  type(exception).__name__, exception)
+					logging.info("\t\tSaving feeds ...")
+					feeds.save()
 				else:
 					logging.info("\t\tNo feed")
 

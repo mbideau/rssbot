@@ -2,7 +2,7 @@
 Convert RSS to email and manage users subscriptions and feeds through email messages.
 
 ## Requirements
-A mailbox than can be connected to with an IMAP server (to read message) and SMTP server (to send message). Both servers needs to accept SSL connections.
+A mailbox than can be connected to with an IMAP server (to read message) and SMTP server (to send message). Both servers needs to accept SSL connections.  
 A Linux server with _python3_ (version _3.7_ is recommended to avoid SSL issues described below).
 
 ## Installation
@@ -27,7 +27,7 @@ Install required python dependencies :
 ~> rssbot/bin/pip install rss2email html2text feedparser beautifulsoup4 python-i18n pyyaml
 ```
 
-### Attention: *python3.5 have a bug in its SSL* implementation or dependencies
+### Attention: *python3.5* have a bug in its SSL implementation or dependencies
 
 I had an unsolvable issue with some (not all) servers SSL connexions that raised the following python exception:
 ```python
@@ -60,7 +60,7 @@ I have tried so many workarounds that I can't remember all of them. Some of them
   ```
   find a valid cipher (was _ECDHE-ECDSA-AES256-GCM-SHA384_ with _TLSv1.2_),
   then creating a python SSLContext using this cipher in a
-  [sample test script](https://stackoverflow.com/a/26851670)
+  [sample test script](https://stackoverflow.com/a/26851670),
   with no success
 
 - trying to make python allow weak ciphers and using deprecated SSLv3 by using an SSLContext that allow them:
@@ -94,7 +94,8 @@ I have tried so many workarounds that I can't remember all of them. Some of them
 
 - doing all that from a different machine with the same python version, with same no results
 
-I had to give up making it work with _python3.5_. When I updated to _python3.7_, everything started working flawlessly with any workground !
+I had to give up making it work with _python3.5_ !  
+When I updated to _python3.7_, everything started working flawlessly with any workground.
 
 
 ### (Not recommended) Patching rss2email to disable SSL verification
@@ -243,4 +244,6 @@ It uses logging as output, so adjust verbosity by adjusting the log level.
 
 It was made and tested on Linux without any knowledge of Windows environment, so it may or may not work on Windows.
 
-It was not unit-tested, but was exhaustively tested with real cases usage (it is in production for myself since 2016 with a few users since 2019).
+It was not unit-tested, but was exhaustively tested with real cases usage.
+
+It is in production for myself since 2016 with a few users since end of 2019.

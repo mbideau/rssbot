@@ -130,7 +130,7 @@ def parse_message(msg):
 
 def process_message(msg):
 	msg_date, from_who, subject, action, feed = parse_message(msg)
-	logging.info('< [%s] %s %s %s', msg_date, from_who, subject, ('(' + feed + ')' if feed else ''))
+	logging.info('< #%4s %10s [%25s] %40s %s %s', num.decode(), action, msg_date, from_who, subject, ('(' + feed + ')' if feed else ''))
 	return process_rss2email(from_who, action, feed)
 
 

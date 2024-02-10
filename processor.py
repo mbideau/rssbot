@@ -284,8 +284,7 @@ def get_feed_name_from_url(url):
 		if params is not None and len(params) > 0:
 			url_noparams = re.sub(r'^(.*/.*)\?.*$', '\\1', url)
 
-	last_alphanum_part = re.sub(r'^.*/([0-9a-zA-Z_-]+)(\.(xml|feed|atom|rss|php))*/?$', '\\1', url_noparams)
-	last_alphanum_part = last_alphanum_part.replace('_', '-')
+	last_alphanum_part = re.sub(r'^.*/([0-9a-zA-Z]+)(\.(xml|feed|atom|rss|php))?/?$', '\\1', url_noparams)
 	if params is None or len(params) <= 0:
 		return domain + '--' + last_alphanum_part
 

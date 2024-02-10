@@ -10,15 +10,32 @@ import re
 import processor
 import imap_reader
 import argparse
+import types
 from rss2email import config as _config
 from rss2email import feeds as _feeds
+from rss2email import feed as _feed
 from rss2email import error as _error
+from rss2email import email as _email
 
 
 def get_config(path):
 	config = configparser.ConfigParser()
 	config.read([path])
 	return config
+
+
+# override the feed send method to reuse the SMTP connexion
+def feed_send(self, sender, message):
+	section = self.section
+	if section not in self.config:
+		section = 'DEFAULT'
+	protocol = self.config.get(section, 'email-protocol')
+	logging.debug('send {} message for {}'.format(protocol, self))
+	if protocol == 'smtp':
+		from_bot = self.config.get(section, 'from')
+		processor.send_message(self.to, message, from_bot=from_bot)
+	else:
+		_email.send(recipient=self.to, message=message, config=self.config, section=section)
 
 
 if __name__ == '__main__':
@@ -91,26 +108,47 @@ if __name__ == '__main__':
 				logging.info("\tUser: %s (%s)", user, udir)
 				data_file = os.path.join(udir, config.get('rss2email', 'data_filename'))
 				config_file = os.path.join(udir, config.get('rss2email', 'configuration_filename'))
-				feeds_config = _config.Config()
-				feeds_config['DEFAULT'] = _config.CONFIG['DEFAULT']
+				feeds_default_config = _config.Config()
+				feeds_default_config['DEFAULT'] = _config.CONFIG['DEFAULT']
 				# run each feed (fetch then send)
-				feeds = _feeds.Feeds(datafile_path=data_file, configfiles=[config_file], config=feeds_config)
+				feeds = _feeds.Feeds(datafile_path=data_file, configfiles=[config_file], config=feeds_default_config)
 				logging.debug("\t\tLoading feeds ...")
 				feeds.load()
 				if feeds:
-					logging.debug("\t\t%d feeds to fetch ...", len(feeds))
-					for feed in feeds:
-						if feed.active:
-							try:
-								logging.info("\t\tFetching: %s", feed.name)
-								feed.run(send=True)
-							#except _error.RSS2EmailError as e:
-							#	e.log()
-							except Exception as exception:
-								logging.error("\t\tCatched an '%s' exception (fetching feed aborted): %s",
-											  type(exception).__name__, exception)
-					logging.info("\t\tSaving feeds ...")
-					feeds.save_feeds()
+					# open an SMTP connexion, else fetching is useless
+					hostname = feeds.config.get('DEFAULT', 'smtp-server')
+					port	 = feeds.config.get('DEFAULT', 'smtp-port')
+					ssl	     = feeds.config.getboolean('DEFAULT', 'smtp-ssl', fallback=False)
+					username = feeds.config.get('DEFAULT', 'smtp-username', fallback=None)
+					password = feeds.config.get('DEFAULT', 'smtp-password', fallback=None)
+					processor.init_smtp(hostname=hostname, port=port, username=username, password=password, ssl=ssl)
+					try:
+						logging.debug("\t\t%d feeds to fetch ...", len(feeds))
+						save_feeds = True
+						for feed in feeds:
+							if feed.active:
+								# override the send method (local to the object) to reuse SMTP connection
+								feed._send = types.MethodType(feed_send, feed)
+								try:
+									logging.info("\t\tFetching: %s", feed.name)
+									feed.run(send=True)
+								except _error.SMTPAuthenticationError as exc:
+									logging.error("\t\tCatched an '%s' exception (fetching feed aborted): %s",
+												  type(exc).__name__, exc)
+									logging.info("\t\tStop fetching feeds (they won't be saved, so they could be fetched later)")
+									save_feeds = False
+									break
+								except Exception as exception:
+									logging.error("\t\tCatched an '%s' exception (fetching feed aborted): %s",
+												  type(exception).__name__, exception)
+						if save_feeds:
+							logging.info("\t\tSaving feeds ...")
+							feeds.save_feeds()
+						else:
+							logging.info("\t\tNot saving feeds")
+					finally:
+						# close smtp connection
+						processor.close_smtp()
 				else:
 					logging.info("\t\tNo feed")
 

@@ -438,6 +438,19 @@ def send_mail(to_addrs, subject, text, html=False):
 	logging.debug("Message sent")
 
 
+def send_message(recipient, msg, from_bot=None):
+	global SMTP_CONNECTION
+	logging.debug("Message to send to '%s'", recipient)
+	check_smtp()
+	if from_bot is None:
+		if get_config() is None:
+			raise RuntimeException(
+				"No 'from' parameter and empty 'config' for Processor instance")
+		from_bot = get_config().get('message', 'from')
+	SMTP_CONNECTION.send_message(msg, from_bot, recipient.split(','))
+	logging.debug("Message sent")
+
+
 # fake to debug
 def send_mail_debug(to_addrs, subject, text):
 	logging.debug("Message to send:\n-- %s\n%s", subject, text)

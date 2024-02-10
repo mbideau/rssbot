@@ -46,13 +46,15 @@ if __name__ == '__main__':
 	log_format = config.get('log', 'format')
 	log_stream = sys.stdout
 	if log_level == 'DEBUG':
-		logging.basicConfig(stream=log_stream, level=logging.DEBUG,   format=log_format)
+		logging.basicConfig(stream=log_stream, level=logging.DEBUG, format=log_format)
+		logging.getLogger().setLevel(logging.DEBUG)
+		logging.getLogger('rss2email').setLevel(logging.DEBUG)
 	elif log_level == 'INFO':
-		logging.basicConfig(stream=log_stream, level=logging.INFO,    format=log_format)
+		logging.basicConfig(stream=log_stream, level=logging.INFO, format=log_format)
 	elif log_level == 'WARNING':
 		logging.basicConfig(stream=log_stream, level=logging.WARNING, format=log_format)
 	elif log_level == 'ERROR':
-		logging.basicConfig(stream=log_stream, level=logging.ERROR,   format=log_format)
+		logging.basicConfig(stream=log_stream, level=logging.ERROR, format=log_format)
 	else:
 		sys.stderr.write("[ERROR] Invalid log level '" + log_level + "'\n")
 		exit(2)

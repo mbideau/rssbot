@@ -94,9 +94,9 @@ if __name__ == '__main__':
 				feeds_config = _config.Config()
 				feeds_config['DEFAULT'] = _config.CONFIG['DEFAULT']
 				# run each feed (fetch then send)
-				feeds = _feeds.Feeds(datafile=data_file, configfiles=[config_file], config=feeds_config)
+				feeds = _feeds.Feeds(datafile_path=data_file, configfiles=[config_file], config=feeds_config)
 				logging.debug("\t\tLoading feeds ...")
-				feeds.load(lock=True)
+				feeds.load()
 				if feeds:
 					logging.debug("\t\t%d feeds to fetch ...", len(feeds))
 					for feed in feeds:
@@ -110,7 +110,7 @@ if __name__ == '__main__':
 								logging.error("\t\tCatched an '%s' exception (fetching feed aborted): %s",
 											  type(exception).__name__, exception)
 					logging.info("\t\tSaving feeds ...")
-					feeds.save()
+					feeds.save_feeds()
 				else:
 					logging.info("\t\tNo feed")
 

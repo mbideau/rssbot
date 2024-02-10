@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 import configparser
 import os
 import logging
-
+import ssl as _ssl
 
 def get_config(path):
 	config = configparser.ConfigParser()
@@ -14,11 +14,28 @@ def get_config(path):
 	return config
 
 
-def open_connection(hostname, port, username, password):
-	logging.debug("Openning SMTP SSL connection to '%s:%s'", hostname, port)
-	connection = smtplib.SMTP_SSL(host=hostname, port=port)
-	logging.debug("Login SMTP with user '%s'", username)
-	connection.login(username, password)
+def open_connection(hostname, port, username, password, ssl = False):
+
+	logging.debug("Openning SMTP connection to '%s:%s'", hostname, port)
+	try:
+		if ssl or (username or password):
+			context = _ssl.create_default_context()
+		if ssl:
+			logging.debug("Starting SMTP SSL session")
+			connection = smtplib.SMTP_SSL(host=hostname, port=port, context=context)
+		else:
+			connection = smtplib.SMTP(host=hostname, port=port)
+	except KeyboardInterrupt:
+		raise
+	if username or password:
+		try:
+			if not ssl:
+				logging.debug("Starting SMTP TLS session")
+				connection.starttls(context=context)
+			logging.debug("Login SMTP with user '%s'", username)
+			connection.login(username, password)
+		except KeyboardInterrupt:
+			raise
 	return connection
 
 

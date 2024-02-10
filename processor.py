@@ -416,7 +416,12 @@ def init_smtp(ssl=None):
 
 def close_smtp():
 	global SMTP_CONNECTION
-	smtp_sender.close_connection(SMTP_CONNECTION)
+	if SMTP_CONNECTION:
+		try:
+			smtp_sender.close_connection(SMTP_CONNECTION)
+		except smtplib.SMTPServerDisconnected:
+			pass
+	SMTP_CONNECTION = None
 
 
 def send_mail(to_addrs, subject, text, html=False):

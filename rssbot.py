@@ -146,9 +146,16 @@ if __name__ == '__main__':
 			sys.exit(1)
 
 		# select mailbox
-		rv, data = imap_conn.select(inbox_name)
+		if inbox_name and ' ' in inbox_name and (inbox_name[0] != '"' or inbox_name[-1] != '"'):
+			inbox_name = '"' + inbox_name + '"'
+		try:
+			logging.info("Selecting IMAP folder '%s'", inbox_name)
+			rv, data = imap_conn.select(inbox_name)
+		except Exception as exc:
+			logging.error("Failed to select INBOX '%s' (%s)", inbox_name, exc)
+			sys.exit(1)
 		if rv != 'OK':
-			logging.error("Failed to selecting INBOX '%s'", inbox_name)
+			logging.error("Failed to select INBOX '%s' (%s)", inbox_name, rv)
 			imap_conn.close()
 			sys.exit(1)
 

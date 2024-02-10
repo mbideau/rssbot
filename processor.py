@@ -108,7 +108,7 @@ def get_email_sender(msg):
 	return from_who
 
 
-def parse_message(msg):
+def parse_message(msg, subject_filter=None):
 	# from
 	from_who = get_email_sender(msg)
 	# to
@@ -121,15 +121,21 @@ def parse_message(msg):
 		msg_date = local_date.strftime("%a, %d %b %Y %H:%M:%S")
 	# subject
 	subject = str(email.header.make_header(email.header.decode_header(msg['Subject'])))
-	# body
-	body = msg['Body']
-	feed = extract_feed_url_from_body(msg)
-	action = subject.strip().lower()
+
+	# action and feed
+	action = '..skiped..'
+	feed = ''
+	if subject and (not subject_filter or subject.startswith(subject_filter)):
+		# action
+		action = re.replace('^'+subject_filter, '', subject).strip().lower()
+		# body
+		body = msg['Body']
+		feed = extract_feed_url_from_body(msg)
 	return msg_date, from_who, subject, action, feed
 
 
-def process_message(msg):
-	msg_date, from_who, subject, action, feed = parse_message(msg)
+def process_message(msg, subject_filter=None):
+	msg_date, from_who, subject, action, feed = parse_message(msg, subject_filter=subject_filter)
 	logging.info('< #%4s %10s [%25s] %40s %s %s', num.decode(), action, msg_date, from_who, subject, ('(' + feed + ')' if feed else ''))
 	return process_rss2email(from_who, action, feed)
 
@@ -308,6 +314,8 @@ def process_rss2email(email, action, url):
 	subject = get_config().get('message', 'subject_prefix') + " Re: " + action.title()
 
 	if not re.match('^[ 	]*(' + '|'.join(get_actions()) + ')[ 	]*$', action, re.IGNORECASE):
+		if action == '..skiped..':
+			return True
 		logging.info("\t\tInvalid action '%s'. Skipping.", action)
 		logging.debug("\t\tAllowed actions in lang '%s': %s", i18n.get('locale'), ', '.join(get_actions()))
 		return True

@@ -16,6 +16,13 @@ def get_config(path):
 
 def open_connection(hostname, port, username, password, ssl = False):
 
+	# support for 'server:port'
+	pos = hostname.find(':')
+	if 0 <= pos:
+		# Strip port out of server name
+		port = int(hostname[pos+1:])
+		hostname = hostname[:pos]
+
 	logging.debug("Openning SMTP connection to '%s:%s'", hostname, port)
 	try:
 		if ssl or (username or password):

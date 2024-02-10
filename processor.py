@@ -400,6 +400,14 @@ def init_smtp(ssl=None):
 		password = get_config().get('account', 'password')
 		if ssl is None:
 			ssl = get_config().getboolean('smtp', 'ssl', fallback=False)
+
+		# support for 'server:port'
+		pos = hostname.find(':')
+		if 0 <= pos:
+			# Strip port out of server name
+			port = int(hostname[pos+1:])
+			hostname = hostname[:pos]
+
 		try:
 			SMTP_CONNECTION = smtp_sender.open_connection(hostname, port, username, password, ssl=ssl)
 		except smtplib.SMTPException:

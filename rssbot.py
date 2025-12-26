@@ -73,7 +73,7 @@ def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-man
                 hostname=hostname, port=port, username=username,
                 password=password, ssl=ssl)
             try:
-                logging.debug("\t\t%d feeds to fetch ...", len(feeds))
+                logging.info("\t\t%d feeds to fetch ...", len(feeds))
                 save_feeds = True
                 for feed in feeds:
                     if feed.active:

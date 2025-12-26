@@ -659,6 +659,9 @@ def init_smtp(hostname=None, port=None, username=None, password=None, ssl=None):
             hostname = hostname[:pos]
 
         try:
+            logging.info(
+                "Establishing SMTP connection to '%s:%s' (ssl: %s) with "
+                "user '%s'", hostname, port, ssl, username)
             SMTP_CONNECTION = smtp_sender.open_connection(
                 hostname, port, username, password, ssl=ssl)
             return SMTP_CONNECTION

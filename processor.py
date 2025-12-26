@@ -48,13 +48,16 @@ def handle_error(exception, msg, result):
 			message=subject + (' (' + feed + ')' if feed else ''),
 			admin=get_config().get('service', 'admin')
 		)
-		subject = get_config().get('message', 'subject_prefix') + " Re: " + action.title()
+		subject = "Re: " + subject
 
 	except Exception as inner_exception:
 		logging.error("Catched an inner exception: %s", inner_exception)
 		try:
 			email = get_email_sender(msg)
-			subject = get_config().get('message', 'subject_prefix') + " Error"
+			subject = "Error"
+			subject_prefix = get_config().get('message', 'subject_prefix', fallback=None)
+			if subject_prefix is not None and len(subject_prefix) > 0:
+				subject = subject_prefix + ' ' + subject
 			response = i18n.t('rssbot.error_exception_fallback',
 							  admin=get_config().get('service', 'admin'),
 							  message=str(msg))
@@ -137,7 +140,7 @@ def parse_message(msg, subject_filter=None):
 def process_message(msg, subject_filter=None):
 	msg_date, from_who, subject, action, feed = parse_message(msg, subject_filter=subject_filter)
 	logging.info('< #%4s %10s [%25s] %40s %s %s', num.decode(), action, msg_date, from_who, subject, ('(' + feed + ')' if feed else ''))
-	return process_rss2email(from_who, action, feed)
+	return process_rss2email(from_who, subject, action, feed)
 
 
 # a near copy-paste from rss2email/feed.py
@@ -309,8 +312,8 @@ def get_actions():
 	]
 
 
-def process_rss2email(email, action, url):
-	subject = get_config().get('message', 'subject_prefix') + " Re: " + action.title()
+def process_rss2email(email, subject, action, url):
+	subject = "Re: " + subject
 
 	if not re.match('^[ 	]*(' + '|'.join(get_actions()) + ')[ 	]*$', action, re.IGNORECASE):
 		if action == '..skiped..':

@@ -536,8 +536,8 @@ def check_for_feed_errors(parsed): # pylint: disable=too-many-branches
     return notices, warnings, errors
 
 
-def handle_error(exception, msg):
-    """Handle an error in a user friendly manger."""
+def handle_incoming_msg_error(exception, msg):
+    """Handle an incoming message error by sending a feedback email to the user."""
     logging.error("Catched an exception (program have aborted): %s", exception)
     _email = None
 

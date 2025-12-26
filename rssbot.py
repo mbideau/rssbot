@@ -186,7 +186,7 @@ def manage_subscriptions_and_feeds_list(global_config):
             #imap_reader.mark_msg_as_not_read(imap_conn, num)
 
     except Exception as exception: # pylint: disable=broad-exception-caught
-        processor.handle_error(exception, msg)
+        processor.handle_incoming_msg_error(exception, msg)
 
     finally:
 

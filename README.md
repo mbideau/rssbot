@@ -93,7 +93,7 @@ port = 993
 
 [smtp]
 hostname =  mail.gandi.net
-port = 587
+port = 465
 
 [account]
 username = rssbot@example.net
@@ -128,7 +128,9 @@ email-protocol = smtp
 smtp-auth = True
 smtp-username = rssbot@example.net
 smtp-password = s3cr3tp4ssWd
-smtp-server = mail.gandi.net:587
+smtp-server = mail.gandi.net:465
+smtp-ssl = True
+;smtp-ssl-protocol = SSLv3 ; not supported since rss2email v3.9.10
 ```
 
 ### Sections explained

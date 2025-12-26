@@ -130,7 +130,9 @@ def parse_message(msg, subject_filter=None):
 	feed = ''
 	if subject and (not subject_filter or subject.startswith(subject_filter)):
 		# action
-		action = re.replace('^'+subject_filter, '', subject).strip().lower()
+		action = subject.strip().lower()
+		if subject_filter and subject.startswith(subject_filter):
+			action = subject[len(subject_filter):].strip().lower()
 		# body
 		body = msg['Body']
 		feed = extract_feed_url_from_body(msg)

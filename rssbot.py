@@ -178,6 +178,7 @@ if __name__ == '__main__':
 		username   = config.get('account', 'username')
 		password   = config.get('account', 'password')
 		inbox_name = config.get('mailbox', 'inbox')
+		subject_filter = config.get('mailbox', 'subject_filter')
 
 		# open connection
 		imap_conn = imap_reader.open_connection(hostname, port, username, password)
@@ -219,7 +220,7 @@ if __name__ == '__main__':
 			num = None
 			msg = None
 			for num, msg in imap_reader.get_messages(imap_conn):
-				result = processor.process_message(msg)
+				result = processor.process_message(msg, subject_filter=subject_filter)
 				if result:
 					imap_reader.mark_msg_as_read(imap_conn, num)
 				else:

@@ -590,6 +590,7 @@ def send_mail(to_addrs, subject, text):
     logging.debug("Message sent")
 
 
+# used by 'rssbot.feed_send' function overriding the send method in rss2email's feed
 def send_message(recipient, msg, from_bot=None):
     """Send an email message to the recipient."""
     global SMTP_CONNECTION # pylint: disable=global-variable-not-assigned

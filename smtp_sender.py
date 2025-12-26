@@ -4,16 +4,8 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import configparser
 import logging
 import ssl as _ssl
-
-def get_config(path):
-    """Get a Config object from a file path."""
-    config = configparser.ConfigParser()
-    config.read([path])
-    return config
-
 
 def open_connection(hostname, port, username, password, ssl = False):
     """Open an SMTP connection, optionnaly through SSL, and login."""

@@ -19,6 +19,12 @@ import imap_reader
 
 def get_config(_path):
     """Get a Config object from a file path."""
+
+    if not os.path.isfile(_path):
+        sys.stderr.write(
+            f"[ERROR] Configuration file '{_path}' doesn't exist\n")
+        sys.exit(2)
+
     _config = configparser.ConfigParser()
     with open(_path, encoding='utf8') as fd_config:
         _config.read_file(fd_config)
@@ -40,6 +46,162 @@ def feed_send(self, sender, message): # pylint: disable=unused-argument
         _email.send(recipient=self.to, message=message, config=self.config, section=section)
 
 
+def fetch_feeds_and_send_email(_users): # pylint: disable=too-many-locals
+    """Fetch user's feeds and send them by email."""
+
+    # for each user
+    for user, udir in _users.items(): # pylint: disable=too-many-nested-blocks
+        logging.info("\tUser: %s (%s)", user, udir)
+        data_file = os.path.join(udir, config.get('rss2email', 'data_filename'))
+        config_file = os.path.join(udir, config.get('rss2email', 'configuration_filename'))
+        feeds_default_config = _config.Config()
+        feeds_default_config['DEFAULT'] = _config.CONFIG['DEFAULT']
+        # run each feed (fetch then send)
+        feeds = _feeds.Feeds(
+            datafile_path=data_file, configfiles=[config_file],
+            config=feeds_default_config)
+        logging.debug("\t\tLoading feeds ...")
+        feeds.load()
+        if feeds:
+            # open an SMTP connexion, else fetching is useless
+            hostname = feeds.config.get('DEFAULT', 'smtp-server')
+            port     = feeds.config.get('DEFAULT', 'smtp-port')
+            ssl         = feeds.config.getboolean('DEFAULT', 'smtp-ssl', fallback=False)
+            username = feeds.config.get('DEFAULT', 'smtp-username', fallback=None)
+            password = feeds.config.get('DEFAULT', 'smtp-password', fallback=None)
+            processor.init_smtp(
+                hostname=hostname, port=port, username=username,
+                password=password, ssl=ssl)
+            try:
+                logging.debug("\t\t%d feeds to fetch ...", len(feeds))
+                save_feeds = True
+                for feed in feeds:
+                    if feed.active:
+                        # override the send method (local to the object)
+                        # to reuse SMTP connection
+                        # pylint: disable=protected-access
+                        feed._send = types.MethodType(feed_send, feed)
+                        try:
+                            logging.info("\t\tFetching: %s", feed.name)
+                            feed.run(send=True)
+                        except _error.SMTPAuthenticationError as exc:
+                            logging.error(
+                                "\t\tCatched an '%s' exception "
+                                "(fetching feed aborted): %s",
+                                type(exc).__name__, exc)
+                            logging.info(
+                                "\t\tStop fetching feeds "
+                                "(they won't be saved, so "
+                                "they could be fetched later)")
+                            save_feeds = False
+                            break
+                        except Exception as exception: # pylint: disable=broad-exception-caught
+                            logging.error(
+                                "\t\tCatched an '%s' exception "
+                                "(fetching feed aborted): %s",
+                                type(exception).__name__, exception)
+                if save_feeds:
+                    logging.info("\t\tSaving feeds ...")
+                    feeds.save_feeds()
+                else:
+                    logging.info("\t\tNot saving feeds")
+            finally:
+                # close smtp connection
+                processor.close_smtp()
+        else:
+            logging.info("\t\tNo feed")
+
+
+def list_user_commands():
+    """List the available commands/actions."""
+
+    # set config for processor module
+    processor.set_config(config)
+
+    # load translations and set locale
+    locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
+    processor.load_translations(locales_dir)
+    locale = config.get('service', 'lang')
+    processor.set_locale(locale)
+
+    print('\n'.join(map(lambda x: x.title(), processor.get_actions())))
+
+
+def manage_subscriptions_and_feeds_list():
+    """Manage user subscriptions and feeds list."""
+
+    logging.info("Processing management messages ...")
+
+    # get connection parameters
+    hostname =   config.get('imap', 'hostname')
+    port        = config.get('imap', 'port')
+    username   = config.get('account', 'username')
+    password   = config.get('account', 'password')
+    inbox_name = config.get('mailbox', 'inbox')
+    subject_filter = config.get('mailbox', 'subject_filter')
+
+    # open connection
+    imap_conn = imap_reader.open_connection(hostname, port, username, password)
+    if not imap_conn:
+        logging.error("Failed to login to '%s:%s' with user '%s'", hostname, port, username)
+        sys.exit(1)
+
+    # select mailbox
+    if inbox_name and ' ' in inbox_name and (inbox_name[0] != '"' or inbox_name[-1] != '"'):
+        inbox_name = '"' + inbox_name + '"'
+    try:
+        logging.info("Selecting IMAP folder '%s'", inbox_name)
+        res, _ = imap_conn.select(inbox_name)
+    except Exception as exc: # pylint: disable=broad-exception-caught
+        logging.error("Failed to select INBOX '%s' (%s)", inbox_name, exc)
+        sys.exit(1)
+    if res != 'OK':
+        logging.error("Failed to select INBOX '%s' (%s)", inbox_name, res)
+        imap_conn.close()
+        sys.exit(1)
+
+    # set config for processor module
+    processor.set_config(config)
+
+    # open smtp connection
+    processor.init_smtp()
+
+    # load translations and set locale
+    locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)),
+                               'locales')
+    processor.load_translations(locales_dir)
+    locale = config.get('service', 'lang')
+    processor.set_locale(locale)
+
+    # process messages
+    logging.debug("Processing mailbox ...")
+
+    try:
+
+        for num, msg in imap_reader.get_messages(imap_conn):
+            if processor.process_message(num, msg, subject_filter=subject_filter):
+                imap_reader.mark_msg_as_read(imap_conn, num)
+            else:
+                imap_reader.mark_msg_as_not_read(imap_conn, num)
+            #imap_reader.mark_msg_as_not_read(imap_conn, num)
+
+    except Exception as exception: # pylint: disable=broad-exception-caught
+        processor.handle_error(exception, msg)
+
+    finally:
+
+        # closing mailbox
+        logging.debug("Closing IMAP mailbox ...")
+        imap_conn.close()
+
+        # close smtp connection
+        processor.close_smtp()
+
+        logging.debug("Logging out IMAP")
+        imap_conn.logout()
+
+
+# main program
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
@@ -60,12 +222,6 @@ if __name__ == '__main__':
                         help="List managment message predefined subjects/"
                              "actions translated")
     args = parser.parse_args()
-
-    if not os.path.isfile(args.config):
-        sys.stderr.write(f"[ERROR] Configuration file '{args.config}' doesn't "
-                          "exist\n")
-        sys.exit(2)
-
 
     # get configuration
     config = get_config(args.config)
@@ -117,154 +273,18 @@ if __name__ == '__main__':
             else:
                 logging.info("User '%s' not found", args.user)
 
-        # for each user
-        for user, udir in users.items():
-            logging.info("\tUser: %s (%s)", user, udir)
-            data_file = os.path.join(udir, config.get('rss2email', 'data_filename'))
-            config_file = os.path.join(udir, config.get('rss2email', 'configuration_filename'))
-            feeds_default_config = _config.Config()
-            feeds_default_config['DEFAULT'] = _config.CONFIG['DEFAULT']
-            # run each feed (fetch then send)
-            feeds = _feeds.Feeds(
-                datafile_path=data_file, configfiles=[config_file],
-                config=feeds_default_config)
-            logging.debug("\t\tLoading feeds ...")
-            feeds.load()
-            if feeds:
-                # open an SMTP connexion, else fetching is useless
-                hostname = feeds.config.get('DEFAULT', 'smtp-server')
-                port     = feeds.config.get('DEFAULT', 'smtp-port')
-                ssl         = feeds.config.getboolean('DEFAULT', 'smtp-ssl', fallback=False)
-                username = feeds.config.get('DEFAULT', 'smtp-username', fallback=None)
-                password = feeds.config.get('DEFAULT', 'smtp-password', fallback=None)
-                processor.init_smtp(
-                    hostname=hostname, port=port, username=username,
-                    password=password, ssl=ssl)
-                try:
-                    logging.debug("\t\t%d feeds to fetch ...", len(feeds))
-                    SAVE_FEEDS = True
-                    for feed in feeds:
-                        if feed.active:
-                            # override the send method (local to the object)
-                            # to reuse SMTP connection
-                            # pylint: disable=protected-access
-                            feed._send = types.MethodType(feed_send, feed)
-                            try:
-                                logging.info("\t\tFetching: %s", feed.name)
-                                feed.run(send=True)
-                            except _error.SMTPAuthenticationError as exc:
-                                logging.error(
-                                    "\t\tCatched an '%s' exception "
-                                    "(fetching feed aborted): %s",
-                                    type(exc).__name__, exc)
-                                logging.info(
-                                    "\t\tStop fetching feeds "
-                                    "(they won't be saved, so "
-                                    "they could be fetched later)")
-                                SAVE_FEEDS = False
-                                break
-                            except Exception as exception: # pylint: disable=broad-exception-caught
-                                logging.error(
-                                    "\t\tCatched an '%s' exception "
-                                    "(fetching feed aborted): %s",
-                                    type(exception).__name__, exception)
-                    if SAVE_FEEDS:
-                        logging.info("\t\tSaving feeds ...")
-                        feeds.save_feeds()
-                    else:
-                        logging.info("\t\tNot saving feeds")
-                finally:
-                    # close smtp connection
-                    processor.close_smtp()
-            else:
-                logging.info("\t\tNo feed")
+        # fetch and send
+        fetch_feeds_and_send_email(users)
 
     # list subjects
     elif args.list_subjects:
 
-        # set config for processor module
-        processor.set_config(config)
-
-        # load translations and set locale
-        locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
-        processor.load_translations(locales_dir)
-        locale = config.get('service', 'lang')
-        processor.set_locale(locale)
-
-        print('\n'.join(map(lambda x: x.title(), processor.get_actions())))
-
+        list_user_commands()
 
     # management messages
     elif args.manage:
 
-        logging.info("Processing management messages ...")
-
-        # get connection parameters
-        hostname =   config.get('imap', 'hostname')
-        port        = config.get('imap', 'port')
-        username   = config.get('account', 'username')
-        password   = config.get('account', 'password')
-        inbox_name = config.get('mailbox', 'inbox')
-        subject_filter = config.get('mailbox', 'subject_filter')
-
-        # open connection
-        imap_conn = imap_reader.open_connection(hostname, port, username, password)
-        if not imap_conn:
-            logging.error("Failed to login to '%s:%s' with user '%s'", hostname, port, username)
-            sys.exit(1)
-
-        # select mailbox
-        if inbox_name and ' ' in inbox_name and (inbox_name[0] != '"' or inbox_name[-1] != '"'):
-            inbox_name = '"' + inbox_name + '"'
-        try:
-            logging.info("Selecting IMAP folder '%s'", inbox_name)
-            rv, data = imap_conn.select(inbox_name)
-        except Exception as exc: # pylint: disable=broad-exception-caught
-            logging.error("Failed to select INBOX '%s' (%s)", inbox_name, exc)
-            sys.exit(1)
-        if rv != 'OK':
-            logging.error("Failed to select INBOX '%s' (%s)", inbox_name, rv)
-            imap_conn.close()
-            sys.exit(1)
-
-        # set config for processor module
-        processor.set_config(config)
-
-        # open smtp connection
-        processor.init_smtp()
-
-        # load translations and set locale
-        locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
-        processor.load_translations(locales_dir)
-        locale = config.get('service', 'lang')
-        processor.set_locale(locale)
-
-        # process messages
-        logging.debug("Processing mailbox ...")
-
-        try:
-
-            for num, msg in imap_reader.get_messages(imap_conn):
-                if processor.process_message(num, msg, subject_filter=subject_filter):
-                    imap_reader.mark_msg_as_read(imap_conn, num)
-                else:
-                    imap_reader.mark_msg_as_not_read(imap_conn, num)
-                #imap_reader.mark_msg_as_not_read(imap_conn, num)
-
-        except Exception as exception: # pylint: disable=broad-exception-caught
-            processor.handle_error(exception, msg)
-
-        finally:
-
-            # closing mailbox
-            logging.debug("Closing IMAP mailbox ...")
-            imap_conn.close()
-
-            # close smtp connection
-            processor.close_smtp()
-
-            logging.debug("Logging out IMAP")
-            imap_conn.logout()
+        manage_subscriptions_and_feeds_list()
 
     # no argument
     else:

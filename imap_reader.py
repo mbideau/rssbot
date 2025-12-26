@@ -3,16 +3,7 @@
 
 import imaplib
 import email
-import configparser
 import logging
-import rss2email
-
-
-def get_config(path):
-    """Get a Config object from a file path."""
-    config = configparser.ConfigParser()
-    config.read([path])
-    return config
 
 
 def open_connection(hostname, port, username, password):

@@ -390,7 +390,7 @@ def check_smtp():
 		raise RuntimeError("You must init an SMTP connection with init_smtp() before processing messages")
 
 
-def init_smtp(hostname=None, port=None, username=None, password=None, ssl=False):
+def init_smtp(hostname=None, port=None, username=None, password=None, ssl=None):
 	global SMTP_CONNECTION
 	if not SMTP_CONNECTION:
 		if hostname is None:
@@ -413,8 +413,9 @@ def init_smtp(hostname=None, port=None, username=None, password=None, ssl=False)
 
 		try:
 			SMTP_CONNECTION = smtp_sender.open_connection(hostname, port, username, password, ssl=ssl)
-		except smtplib.SMTPException:
-			logging.error("Failed to connect to SMTP server '%s:%s' with user '%s'", hostname, port, username)
+			return SMTP_CONNECTION
+		except smtplib.SMTPException as smtp_exc:
+			logging.error("Failed to connect to SMTP server '%s:%s' (ssl: %s) with user '%s' (%s)", hostname, port, ssl, username, smtp_exc)
 			return False
 
 def close_smtp():

@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--config', default='configuration.ini',
                     help="Path to the configuration file. "
                          "Default: configuration.ini")
-parser.add_argument('-l', '--limit', default=10,
+parser.add_argument('-l', '--limit', default=10, type=int,
                     help="Maximum number of email to read. "
                          "Default: 10")
 args = parser.parse_args()

@@ -220,7 +220,7 @@ if __name__ == '__main__':
 			num = None
 			msg = None
 			for num, msg in imap_reader.get_messages(imap_conn):
-				result = processor.process_message(msg, subject_filter=subject_filter)
+				result = processor.process_message(num, msg, subject_filter=subject_filter)
 				if result:
 					imap_reader.mark_msg_as_read(imap_conn, num)
 				else:

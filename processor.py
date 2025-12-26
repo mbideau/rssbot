@@ -160,6 +160,11 @@ def parse_message(msg, subject_filter=None):
         # body
         #body = msg['Body']
         feed = extract_feed_url_from_body(msg)
+    elif subject and subject_filter and not subject.startswith(subject_filter):
+        logging.debug("Subject '%s' do not starts with '%s': skiping",
+                      subject, subject_filter)
+    elif not subject:
+        logging.debug("Empty subject: skiping")
 
     return msg_date, from_who, subject, action, feed
 

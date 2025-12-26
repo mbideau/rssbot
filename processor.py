@@ -148,7 +148,7 @@ def parse_message(msg, subject_filter=None):
     subject = str(email.header.make_header(email.header.decode_header(msg['Subject'])))
 
     # action and feed
-    action = '..skiped..'
+    action = '..skipped..'
     feed = ''
     if subject and (not subject_filter or subject.startswith(subject_filter)):
 
@@ -272,7 +272,7 @@ def extract_feed_url_from_body(msg): # pylint: disable=too-many-branches
                     lines = payload.decode(charset).strip().split('\n')
                     html.extend(lines)
         else:
-            logging.debug("\t\tBody skiped: %s (multipart: %s)",
+            logging.debug("\t\tBody skipped: %s (multipart: %s)",
                           part.get_content_type(), part.is_multipart())
     if not url and html:
         url = get_feed_from_content(html, True)
@@ -361,7 +361,7 @@ def process_rss2email(_email, subject, action, url): # pylint: disable=too-many-
     subject = "Re: " + subject
 
     if not re.match('^[     ]*(' + '|'.join(get_actions()) + ')[     ]*$', action, re.IGNORECASE):
-        if action == '..skiped..':
+        if action == '..skipped..':
             return True
         logging.info("\t\tInvalid action '%s'.", action)
         logging.debug("\t\tAllowed actions in lang '%s': %s", i18n.get('locale'),

@@ -76,7 +76,7 @@ def get_feeds(email):
 	data_file = join(d_path, get_config().get('rss2email', 'data_filename'))
 	config_file = join(d_path, get_config().get('rss2email', 'configuration_filename'))
 	logging.debug("Loading feeds for '%s' (data:'%s', config:'%s')", email, data_file, config_file)
-	return _feeds.Feeds(datafile=data_file, configfiles=[config_file])
+	return _feeds.Feeds(datafile_path=data_file, configfiles=[config_file])
 
 
 def get_config():
@@ -540,8 +540,8 @@ def rss2email_add_feed(email, url):
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
 				  email)
-	feeds.load(lock=True)
-	logging.debug("\t\tSuccessfully loaded feeds (lock=True)")
+	feeds.load()
+	logging.debug("\t\tSuccessfully loaded feeds")
 	feed = feeds.new_feed(name=name, url=url, to=email)
 	logging.debug("\t\tCreated the new feeds (name=%s, url=%s, to=%s)",
 				  name, url[:30] + ('…' if len(url) > 30 else ''), email)
@@ -565,8 +565,8 @@ def rss2email_delete_feed(email, index):
 				  number_of_feeds,
 				  's' if number_of_feeds > 1 else '',
 				  email)
-	feeds.load(lock=True)
-	logging.debug("\t\tSuccessfully loaded feeds (lock=True)")
+	feeds.load()
+	logging.debug("\t\tSuccessfully loaded feeds")
 	feed = feeds.index(index)
 	logging.debug("\t\tFeed: %s", feed)
 	feeds.remove(feed)
@@ -586,7 +586,7 @@ def rss2email_list_feeds(email):
 	logging.debug("\t\tListing feeds for '%s'", email)
 	output = []
 	feeds = get_feeds(email)
-	feeds.load(lock=False)
+	feeds.load()
 	for i,feed in enumerate(feeds):
 		if feed.active:
 			active_char = '*'
@@ -598,7 +598,7 @@ def rss2email_list_feeds(email):
 
 def rss2email_get_feed_index(email, url):
 	feeds = get_feeds(email)
-	feeds.load(lock=False)
+	feeds.load()
 	for i, feed in enumerate(feeds):
 		if feed.url == url:
 			return i

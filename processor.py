@@ -607,6 +607,15 @@ def send_message(recipient, msg, from_bot=None):
     except smtplib.SMTPDataError as exc:
         logging.error("\t\tFailed to send message to '%s' (from: %s): %s",
                       recipient, from_bot, exc)
+    except smtplib.SMTPServerDisconnected as exc:
+        logging.error("\t\tFailed to send message to '%s' (from: %s): %s",
+                      recipient, from_bot, exc)
+        logging.error("\t\tMore detail: msg = %s", msg)
+        for key in ['From', 'To', 'Return-path']:
+            if key in msg:
+                logging.error("\t\tMore detail: msg[%s] = '%s'", key, msg[key])
+        # TODO: implements
+        # logging.info("\t\treconnecting to SMTP ...")
 
 
 # fake to debug

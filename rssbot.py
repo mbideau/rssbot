@@ -217,6 +217,7 @@ if __name__ == '__main__':
 
 		try:
 
+			result = None
 			num = None
 			msg = None
 			for num, msg in imap_reader.get_messages(imap_conn):

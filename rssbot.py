@@ -167,7 +167,7 @@ if __name__ == '__main__':
                                     type(exception).__name__, exception)
                     if SAVE_FEEDS:
                         logging.info("\t\tSaving feeds ...")
-                        feeds.SAVE_FEEDS()
+                        feeds.save_feeds()
                     else:
                         logging.info("\t\tNot saving feeds")
                 finally:

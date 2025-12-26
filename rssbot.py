@@ -20,7 +20,8 @@ import imap_reader
 def get_config(_path):
     """Get a Config object from a file path."""
     _config = configparser.ConfigParser()
-    _config.read([_path])
+    with open(_path, encoding='utf8') as fd_config:
+        _config.read_file(fd_config)
     return _config
 
 
@@ -86,6 +87,8 @@ if __name__ == '__main__':
     else:
         sys.stderr.write("[ERROR] Invalid log level '" + log_level + "'\n")
         sys.exit(2)
+
+    logging.debug("Loaded configuration from file %s", args.config)
 
     # fetch and send
     if args.fetch_all or args.user:

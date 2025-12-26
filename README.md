@@ -101,7 +101,7 @@ password = s3cr3tp4ssWd
 
 [mailbox]
 inbox = INBOX
-subject_filter = [add RSS feed]
+subject_filter = [rss]
 
 [message]
 from = rssbot@example.net

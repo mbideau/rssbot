@@ -14,6 +14,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--config', default='configuration.ini',
                     help="Path to the configuration file. "
                          "Default: configuration.ini")
+parser.add_argument('-f', '--flag', default='UNSEEN',
+                    help="Flag to specify the type of message to read. "
+                         "Default: UNSEEN")
 parser.add_argument('-l', '--limit', default=10, type=int,
                     help="Maximum number of email to read. "
                          "Default: 10")
@@ -70,9 +73,9 @@ if rv != 'OK':
     sys.exit(1)
 testlog.debug("Selected Inbox: '%s'", inbox_name)
 
-def get_messages(_conn):
+def get_messages(_conn, flag='UNSEEN'):
     """Get messages/emails from IMAP connection."""
-    _type, _data = _conn.search(None,'(UNSEEN)')
+    _type, _data = _conn.search(None, f'({flag})')
     for _num in _data[0].split():
         _rv, _data = _conn.fetch(_num,'(RFC822)')
         if _rv != 'OK':
@@ -103,10 +106,16 @@ def parse_message(_msg):
     return msg_date, from_who, subject
 
 COUNT = 0
-testlog.debug("Reading messages ...")
-for num, msg in get_messages(imap_conn):
-    when, who, about = parse_message(msg)
-    testlog.info('< #%4s %10s [%40s] %s', num.decode(), when, who, about)
+testlog.debug("Reading %s messages ...", args.flag)
+for num, msg in get_messages(imap_conn, args.flag):
+    try:
+        when, who, about = parse_message(msg)
+        testlog.info('< #%4s %10s [%40s] %s', num.decode(), when, who, about)
+    except Exception as exc: # pylint: disable=broad-exception-caught
+        testlog.error("%s. Failed to process message [%s] %s", exc, num.decode(), msg)
+    if args.flag == 'UNSEEN':
+        imap_conn.store(num,'-FLAGS','\\Seen') # re-flag message as UNSEEN
+        #testlog.debug("Flaging message [%s] as UNSEEN", num.decode())
     COUNT += 1
     if COUNT == args.limit:
         testlog.debug("Reached limit '%d', stoping.", args.limit)

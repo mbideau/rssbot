@@ -133,11 +133,11 @@ def manage_subscriptions_and_feeds_list():
     logging.info("Processing management messages ...")
 
     # get connection parameters
-    hostname =   config.get('imap', 'hostname')
-    port        = config.get('imap', 'port')
-    username   = config.get('account', 'username')
-    password   = config.get('account', 'password')
-    inbox_name = config.get('mailbox', 'inbox')
+    hostname       = config.get('imap', 'hostname')
+    port           = config.get('imap', 'port')
+    username       = config.get('account', 'username')
+    password       = config.get('account', 'password')
+    inbox_name     = config.get('mailbox', 'inbox')
     subject_filter = config.get('mailbox', 'subject_filter')
 
     # open connection

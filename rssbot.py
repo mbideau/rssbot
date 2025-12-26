@@ -25,10 +25,10 @@ def get_config(_path):
             f"[ERROR] Configuration file '{_path}' doesn't exist\n")
         sys.exit(2)
 
-    _config = configparser.ConfigParser()
+    global_config = configparser.ConfigParser()
     with open(_path, encoding='utf8') as fd_config:
-        _config.read_file(fd_config)
-    return _config
+        global_config.read_file(fd_config)
+    return global_config
 
 
 # override the feed send method to reuse the SMTP connexion
@@ -46,14 +46,14 @@ def feed_send(self, sender, message): # pylint: disable=unused-argument
         _email.send(recipient=self.to, message=message, config=self.config, section=section)
 
 
-def fetch_feeds_and_send_email(_users): # pylint: disable=too-many-locals
+def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-many-locals
     """Fetch user's feeds and send them by email."""
 
     # for each user
     for user, udir in _users.items(): # pylint: disable=too-many-nested-blocks
         logging.info("\tUser: %s (%s)", user, udir)
-        data_file = os.path.join(udir, config.get('rss2email', 'data_filename'))
-        config_file = os.path.join(udir, config.get('rss2email', 'configuration_filename'))
+        data_file = os.path.join(udir, global_config.get('rss2email', 'data_filename'))
+        config_file = os.path.join(udir, global_config.get('rss2email', 'configuration_filename'))
         feeds_default_config = _config.Config()
         feeds_default_config['DEFAULT'] = _config.CONFIG['DEFAULT']
         # run each feed (fetch then send)
@@ -112,33 +112,33 @@ def fetch_feeds_and_send_email(_users): # pylint: disable=too-many-locals
             logging.info("\t\tNo feed")
 
 
-def list_user_commands():
+def list_user_commands(global_config):
     """List the available commands/actions."""
 
     # set config for processor module
-    processor.set_config(config)
+    processor.set_config(global_config)
 
     # load translations and set locale
     locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
     processor.load_translations(locales_dir)
-    locale = config.get('service', 'lang')
+    locale = global_config.get('service', 'lang')
     processor.set_locale(locale)
 
     print('\n'.join(map(lambda x: x.title(), processor.get_actions())))
 
 
-def manage_subscriptions_and_feeds_list():
+def manage_subscriptions_and_feeds_list(global_config):
     """Manage user subscriptions and feeds list."""
 
     logging.info("Processing management messages ...")
 
     # get connection parameters
-    hostname       = config.get('imap', 'hostname')
-    port           = config.get('imap', 'port')
-    username       = config.get('account', 'username')
-    password       = config.get('account', 'password')
-    inbox_name     = config.get('mailbox', 'inbox')
-    subject_filter = config.get('mailbox', 'subject_filter')
+    hostname       = global_config.get('imap', 'hostname')
+    port           = global_config.get('imap', 'port')
+    username       = global_config.get('account', 'username')
+    password       = global_config.get('account', 'password')
+    inbox_name     = global_config.get('mailbox', 'inbox')
+    subject_filter = global_config.get('mailbox', 'subject_filter')
 
     # open connection
     imap_conn = imap_reader.open_connection(hostname, port, username, password)
@@ -161,7 +161,7 @@ def manage_subscriptions_and_feeds_list():
         sys.exit(1)
 
     # set config for processor module
-    processor.set_config(config)
+    processor.set_config(global_config)
 
     # open smtp connection
     processor.init_smtp()
@@ -170,7 +170,7 @@ def manage_subscriptions_and_feeds_list():
     locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)),
                                'locales')
     processor.load_translations(locales_dir)
-    locale = config.get('service', 'lang')
+    locale = global_config.get('service', 'lang')
     processor.set_locale(locale)
 
     # process messages
@@ -274,17 +274,17 @@ if __name__ == '__main__':
                 logging.info("User '%s' not found", args.user)
 
         # fetch and send
-        fetch_feeds_and_send_email(users)
+        fetch_feeds_and_send_email(config, users)
 
     # list subjects
     elif args.list_subjects:
 
-        list_user_commands()
+        list_user_commands(config)
 
     # management messages
     elif args.manage:
 
-        manage_subscriptions_and_feeds_list()
+        manage_subscriptions_and_feeds_list(config)
 
     # no argument
     else:

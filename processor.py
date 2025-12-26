@@ -509,8 +509,12 @@ def send_message(recipient, msg, from_bot=None):
             raise Exception( # pylint: disable=broad-exception-raised
                 "No 'from' parameter and empty 'config' for Processor instance")
         from_bot = get_config().get('message', 'from')
-    SMTP_CONNECTION.send_message(msg, from_bot, recipient.split(','))
-    logging.debug("Message sent")
+    try:
+        SMTP_CONNECTION.send_message(msg, from_bot, recipient.split(','))
+        logging.debug("Message sent")
+    except smtplib.SMTPDataError as exc:
+        logging.error("\t\tFailed to send message to '%s' (from: %s): %s",
+                      recipient, from_bot, exc)
 
 
 # fake to debug

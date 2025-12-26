@@ -318,8 +318,11 @@ def process_rss2email(email, subject, action, url):
 	if not re.match('^[ 	]*(' + '|'.join(get_actions()) + ')[ 	]*$', action, re.IGNORECASE):
 		if action == '..skiped..':
 			return True
-		logging.info("\t\tInvalid action '%s'. Skipping.", action)
+		logging.info("\t\tInvalid action '%s'.", action)
 		logging.debug("\t\tAllowed actions in lang '%s': %s", i18n.get('locale'), ', '.join(get_actions()))
+		response = i18n.t('rssbot.error_invalid_action', action=action, allowed_actions=', '.join(get_actions()))
+		send_mail(email, subject, response)
+		logging.info("> %s", response)
 		return True
 
 	has_subscription = rss2email_has_subscriptions(email)

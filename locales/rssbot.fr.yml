@@ -1,4 +1,5 @@
 fr:
+  error_invalid_action: "Action '%{action}' invalide. Les actions autorisées (dans le champ 'sujet') sont: %{allowed_actions}."
   error_no_subscription: "Votre email '%{email}' n'apparait pas dans la base de données du service %{service}.\nSi vous souhaitez vous inscrire, envoyez un mail avec en sujet '%{subscribe}'."
   error_already_subscribed: "Votre email '%{email}' est déjà inscrit au service %{service}."
   error_no_feed_found: "Impossible de trouver un flux (lien http) dans votre requête."

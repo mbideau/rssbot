@@ -1,4 +1,5 @@
 en:
+  error_invalid_action: "Invalid action '%{action}'. Allowed actions (in 'subject' field) are: %{allowed_actions}."
   error_no_subscription: "Your email '%{email}' doesn't exist in the %{service} serivce database.\nIf you want the subscribe, send a mail with subject '%{subscribe}'."
   error_already_subscribed: "Your email '%{email}' is already registered with the %{service} service."
   error_no_feed_found: "Failed to find a feed (http url) in your request."

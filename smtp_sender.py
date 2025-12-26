@@ -26,11 +26,13 @@ def open_connection(hostname, port, username, password, ssl = False):
 	logging.debug("Openning SMTP connection to '%s:%s'", hostname, port)
 	try:
 		if ssl or (username or password):
+			logging.debug("Creating SMTP SSL context")
 			context = _ssl.create_default_context()
 		if ssl:
 			logging.debug("Starting SMTP SSL session")
 			connection = smtplib.SMTP_SSL(host=hostname, port=port, context=context)
 		else:
+			logging.debug("Starting SMTP session (no SSL)")
 			connection = smtplib.SMTP(host=hostname, port=port)
 	except KeyboardInterrupt:
 		raise

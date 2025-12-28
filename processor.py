@@ -100,7 +100,7 @@ def parse_message(msg, subject_filter=None):
     return msg_date, from_who, subject, action, feed
 
 
-def process_message(num, msg, subject_filter='[rss]'):
+def process_message(num, msg, subject_filter=None):
     """Process a message."""
     msg_date, from_who, subject, action, feed = parse_message(msg, subject_filter=subject_filter)
     logging.info('< #%4s %10s [%25s] %40s %s %s', num.decode(), action,

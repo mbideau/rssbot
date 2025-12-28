@@ -229,8 +229,8 @@ def get_actions():
 def get_feeds(_email):
     """Return RSS feeds object ready to be processed."""
     d_path = rss2email_get_data_dir_from_email(_email)
-    data_file = join(d_path, get_config().get('rss2email', 'data_filename'))
-    config_file = join(d_path, get_config().get('rss2email', 'configuration_filename'))
+    data_file = join(d_path, get_config().get('data', 'data_filename'))
+    config_file = join(d_path, get_config().get('data', 'configuration_filename'))
     logging.debug("Loading feeds for '%s' (data:'%s', config:'%s')", _email, data_file, config_file)
     return _feeds.Feeds(datafile_path=data_file, configfiles=[config_file])
 
@@ -243,15 +243,15 @@ def sanitize_email(_email):
 
 def rss2email_get_data_dir_from_email(_email):
     """Create a user data directory path matching an email."""
-    return join(get_config().get('rss2email', 'data_dir'), sanitize_email(_email))
+    return join(get_config().get('data', 'data_dir'), sanitize_email(_email))
 
 
 def rss2email_has_subscriptions(_email):
     """Return True if the email match an existing subscription."""
     d_path = rss2email_get_data_dir_from_email(_email)
     return isdir(d_path) \
-    and isfile(join(d_path, get_config().get('rss2email', 'configuration_filename'))) \
-    and isfile(join(d_path, get_config().get('rss2email', 'data_filename')))
+    and isfile(join(d_path, get_config().get('data', 'configuration_filename'))) \
+    and isfile(join(d_path, get_config().get('data', 'data_filename')))
 
 
 def rss2email_new_subscription(_email):
@@ -270,7 +270,7 @@ def rss2email_new_subscription(_email):
             f"Got '{number_of_feeds}' for user '{_email}'")
     feeds.config['DEFAULT']['to'] = _email
     feeds.config['DEFAULT']['from'] = get_config().get('message', 'from')
-    for key, val in get_config()['DEFAULT'].items():
+    for key, val in get_config()['rss2email'].items():
         feeds.config['DEFAULT'][key] = val
     feeds.save()
     logging.debug("\t\tFeeds saved for '%s'", _email)

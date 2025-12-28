@@ -107,7 +107,7 @@ subject_filter = [rss]
 from = rssbot@example.net
 subject_prefix = [rss2email]
 
-[rss2email]
+[data]
 data_dir = /srv/rss2email
 configuration_filename = configuration.cfs
 data_filename = data.json
@@ -122,7 +122,7 @@ admin = admin@example.net
 level = INFO
 format = %%(asctime)-15s    %%(levelname)-8s %%(message)s
 
-[DEFAULT]
+[rss2email]
 html-mail = True
 use-css = True
 email-protocol = smtp
@@ -141,10 +141,10 @@ smtp-ssl = True
 - **account** : The credentials to connect with, to IMAP and SMTP (assuming they use the same)
 - **mailbox** : The inbox parameters, like the Inbox name in the IMAP server.
 - **message** : The outgoing management anwser message parameters, like the sender address and the subject's prefix
-- **rss2email** : The parameters to manage rss2email user directories and files
+- **data** : The data files and directories (used by *rss2email*)
 - **service** : The service parameters, like its name, its language and its administrator contact
 - **log** : The logging parameters
-- **DEFAULT** : The default configuration parameters that will be used by each user of rss2email
+- **rss2email** : The default configuration parameters that will be used by each user of *rss2email*
 
 
 ## Notes

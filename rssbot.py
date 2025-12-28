@@ -52,8 +52,8 @@ def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-man
     # for each user
     for user, udir in _users.items(): # pylint: disable=too-many-nested-blocks
         logging.info("\tUser: %s (%s)", user, udir)
-        data_file = os.path.join(udir, global_config.get('rss2email', 'data_filename'))
-        config_file = os.path.join(udir, global_config.get('rss2email', 'configuration_filename'))
+        data_file = os.path.join(udir, global_config.get('data', 'data_filename'))
+        config_file = os.path.join(udir, global_config.get('data', 'configuration_filename'))
         feeds_default_config = _config.Config()
         feeds_default_config['DEFAULT'] = _config.CONFIG['DEFAULT']
         # run each feed (fetch then send)
@@ -252,7 +252,7 @@ if __name__ == '__main__':
         logging.info("Fetching and sending feeds ...")
         users = {}
 
-        data_dir = config.get('rss2email', 'data_dir')
+        data_dir = config.get('data', 'data_dir')
         logging.debug("From data dir: '%s'", data_dir)
 
         # all users

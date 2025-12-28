@@ -108,6 +108,25 @@ def process_message(num, msg, subject_filter=None):
     return process_rss2email(from_who, subject, action, feed)
 
 
+def manage_help():
+    """Return help for management message."""
+    service_mail = get_config().get('service', 'mail')
+    service_name = get_config().get('service', 'name')
+    out = i18n.t('rssbot.help_header', service=service_name, mail=service_mail)
+    out += '\n\n'
+    lines = [
+        i18n.t('rssbot.subscribe') + ' : ' + i18n.t('rssbot.subscribe_help',
+                                                    service=service_name),
+        i18n.t('rssbot.unsubscribe') + ' : ' + i18n.t('rssbot.unsubscribe_help',
+                                                      service=service_name),
+        i18n.t('rssbot.add') + ' : ' + i18n.t('rssbot.add_help'),
+        i18n.t('rssbot.delete') + ' : ' + i18n.t('rssbot.delete_help'),
+        i18n.t('rssbot.list') + ' : ' + i18n.t('rssbot.list_help')]
+    lines = list(map(lambda x: ' - ' + x + '\n', lines))
+    out += '\n'.join(lines)
+    return out
+
+
 def process_rss2email(_email, subject, action, url): # pylint: disable=too-many-statements,too-many-branches
     """Manage RSS subscriptions."""
     subject = "Re: " + subject
@@ -122,6 +141,12 @@ def process_rss2email(_email, subject, action, url): # pylint: disable=too-many-
                           allowed_actions=', '.join(get_actions()))
         send_mail(_email, subject, response)
         logging.info("> %s", response)
+        return True
+
+    if i18n.t('rssbot.help') == action:
+        output = manage_help()
+        send_mail(_email, subject, output)
+        logging.info("> %s", output)
         return True
 
     has_subscription = rss2email_has_subscriptions(_email)
@@ -192,6 +217,7 @@ def process_rss2email(_email, subject, action, url): # pylint: disable=too-many-
 def get_actions():
     """List available actions."""
     return [
+        i18n.t('rssbot.help'),
         i18n.t('rssbot.subscribe'),
         i18n.t('rssbot.unsubscribe'),
         i18n.t('rssbot.add'),

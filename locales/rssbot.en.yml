@@ -15,9 +15,16 @@ en:
   action_feed_add_refused: "Not adding invalid feed '%{url}'."
   action_feed_deleted: "Feed '%{url}' deleted."
 
+  help: help
   subscribe: subscribe
   unsubscribe: unsubscribe
   add: add
   delete: delete
   list: list
-	
+
+  help_header: "%{service} is a service to turn RSS feeds to mail.\n\nTo interact with the service you can send an email to %{mail} with the following subjects:"
+  subscribe_help: "subscribe to the '%{service}' service (feeds will be sent to the email address of the subscription message)"
+  unsubscribe_help: "unsubscribe to the '%{service}' service (all your feeds will be deleted)"
+  add_help: "add a feed source URL to your feed list (just put the URL in the email content)"
+  delete_help: "delete a feed source URL from your feed list (just put the URL in the email content)"
+  list_help: "list all your feeds sources"

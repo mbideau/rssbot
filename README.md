@@ -114,6 +114,7 @@ data_filename = data.json
 
 [service]
 name = rss2email
+mail = rssbot@example.net
 lang = fr
 admin = admin@example.net
 

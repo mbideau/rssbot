@@ -15,8 +15,16 @@ fr:
   action_feed_add_refused: "Refus de l'ajout du flux invalide '%{url}'"
   action_feed_deleted: "Flux '%{url}' supprimé."
 
+  help: aide
   subscribe: inscription
   unsubscribe: désinscription
   add: ajouter
   delete: supprimer
   list: lister
+
+  help_header: "%{service} est un service de transformation de flux RSS en email.\n\nPour interagir avec le service vous pouvez envoyer un email à %{mail} avec les objets suivants:"
+  subscribe_help: "souscrire au service '%{service}' (les flux seront expédiés vers l'adresse mail du message de souscription)"
+  unsubscribe_help: "se désinscrire du service '%{service}' (tous vos flux seront supprimés)"
+  add_help: "ajouter l'URL source d'un flux à votre liste de flux (renseignez simplement l'URL dans le corps du mail)"
+  delete_help: "supprimer l'URL source d'un flux de votre liste de flux (renseignez simplement l'URL dans le corps du mail)"
+  list_help: "lister toutes les sources de vos flux"

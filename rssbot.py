@@ -244,6 +244,25 @@ if __name__ == '__main__':
         sys.stderr.write("[ERROR] Invalid log level '" + log_level + "'\n")
         sys.exit(2)
 
+    # prevent rss2email to write to stderr, and prefix its log messages
+    for handler in logging.getLogger('rss2email').handlers:
+        if (type(handler).__name__ == 'StreamHandler' and hasattr(handler, 'stream')
+                and hasattr(handler.stream, 'name') and handler.stream.name == '<stderr>'):
+
+            # replace stderr output with stdout
+            old_stream = handler.setStream(sys.stdout)
+            logging.debug(
+                "rss2email log changed stream from '%s' to '%s'",
+                old_stream.name, handler.stream.name)
+
+            # setup a new log formatter with the same format but with a prefix
+            log_formatter = logging.Formatter(
+                log_format.replace('%(message)s', '[rss2email] %(message)s'))
+            handler.setFormatter(log_formatter)
+            logging.debug(
+                "rss2email log format set to '%s'",
+                log_formatter._fmt) # pylint: disable=protected-access
+
     logging.debug("Loaded configuration from file %s", args.config)
 
     # fetch and send

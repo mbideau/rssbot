@@ -7,12 +7,11 @@ import configparser
 import os
 import logging
 import sys
+import time
 import types
 
 from rss2email import config as _config # pylint: disable=import-error
 from rss2email import feeds as _feeds # pylint: disable=import-error
-from rss2email import error as _error # pylint: disable=import-error
-from rss2email import email as _email # pylint: disable=import-error
 
 import processor
 import imap_reader
@@ -31,32 +30,8 @@ def get_config(_path):
     return global_config
 
 
-# override the feed send method to reuse the SMTP connexion
-def feed_send(self, sender, message): # pylint: disable=unused-argument
-    """Send an email containing the RSS content."""
-    section = self.section
-    if section not in self.config:
-        section = 'DEFAULT'
-    protocol = self.config.get(section, 'email-protocol')
-    logging.debug('send %s message for %s', protocol, self)
-    if protocol == 'smtp':
-        from_bot = self.config.get(section, 'from')
-        processor.send_message(self.to, message, from_bot=from_bot)
-    else:
-        _email.send(recipient=self.to, message=message, config=self.config, section=section)
-
-
 def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-many-locals
     """Fetch user's feeds and send them by email."""
-
-    # set config for processor module
-    processor.set_config(global_config)
-
-    # load translations and set locale
-    locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
-    processor.load_translations(locales_dir)
-    locale = global_config.get('service', 'lang')
-    processor.set_locale(locale)
 
     # for each user
     for user, udir in _users.items(): # pylint: disable=too-many-nested-blocks
@@ -72,69 +47,42 @@ def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-man
         logging.debug("\t\tLoading feeds ...")
         feeds.load()
         if feeds:
-            # open an SMTP connexion, else fetching is useless
-            hostname = feeds.config.get('DEFAULT', 'smtp-server')
-            port     = feeds.config.get('DEFAULT', 'smtp-port')
-            ssl         = feeds.config.getboolean('DEFAULT', 'smtp-ssl', fallback=False)
-            username = feeds.config.get('DEFAULT', 'smtp-username', fallback=None)
-            password = feeds.config.get('DEFAULT', 'smtp-password', fallback=None)
-            processor.init_smtp(
-                hostname=hostname, port=port, username=username,
-                password=password, ssl=ssl)
-            try:
-                logging.info("\t\t%d feeds to fetch ...", len(feeds))
-                save_feeds = True
-                for feed in feeds:
-                    if feed.active:
-                        # add a post processing function
-                        feed.post_process = processor.msg_post_process
+            logging.info("\t\t%d feeds to fetch ...", len(feeds))
+            save_feeds = True
+            for feed in feeds:
+                if feed.active:
+                    # add a post processing function
+                    feed.post_process = processor.msg_post_process
 
-                        # override the send method (local to the object)
-                        # to reuse SMTP connection
-                        # pylint: disable=protected-access
-                        feed._send = types.MethodType(feed_send, feed)
-                        try:
-                            logging.info("\t\tFetching: %s", feed.name)
-                            feed.run(send=True)
-                        except _error.SMTPAuthenticationError as exc:
-                            logging.error(
-                                "\t\tCatched an '%s' exception "
-                                "(fetching feed aborted): %s",
-                                type(exc).__name__, exc)
-                            logging.info(
-                                "\t\tStop fetching feeds "
-                                "(they won't be saved, so "
-                                "they could be fetched later)")
-                            save_feeds = False
-                            break
-                        except Exception as exception: # pylint: disable=broad-exception-caught
-                            logging.error(
-                                "\t\tCatched an '%s' exception "
-                                "(fetching feed aborted): %s",
-                                type(exception).__name__, exception)
-                if save_feeds:
-                    logging.info("\t\tSaving feeds ...")
-                    feeds.save_feeds()
-                else:
-                    logging.info("\t\tNot saving feeds")
-            finally:
-                # close smtp connection
-                processor.close_smtp()
+                    # override the send method (local to the object)
+                    # to reuse SMTP connection
+                    # pylint: disable=protected-access
+                    feed._send = types.MethodType(processor.feed_send, feed)
+                    try:
+                        logging.info("\t\tFetching: %s", feed.name)
+                        feed.run(send=True)
+                    except processor.ProcessorExc as exc:
+                        logging.error(
+                            "\t\tCatched an '%s' exception "
+                            "(fetching feed aborted): %s",
+                            type(exc).__name__, exc)
+                        save_feeds = False
+                        break
+                    except Exception as exc: # pylint: disable=broad-exception-caught
+                        logging.error(
+                            "\t\tCatched an '%s' exception: %s",
+                            type(exc).__name__, exc)
+            if save_feeds:
+                logging.info("\t\tSaving feeds ...")
+                feeds.save_feeds()
+            else:
+                logging.info("\t\tNot saving feeds")
         else:
             logging.info("\t\tNo feed")
 
 
-def list_user_commands(global_config):
+def list_user_commands():
     """List the available commands/actions."""
-
-    # set config for processor module
-    processor.set_config(global_config)
-
-    # load translations and set locale
-    locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
-    processor.load_translations(locales_dir)
-    locale = global_config.get('service', 'lang')
-    processor.set_locale(locale)
 
     print('\n'.join(map(lambda x: x.title(), processor.get_actions())))
 
@@ -172,19 +120,6 @@ def manage_subscriptions_and_feeds_list(global_config):
         imap_conn.close()
         sys.exit(1)
 
-    # set config for processor module
-    processor.set_config(global_config)
-
-    # open smtp connection
-    processor.init_smtp()
-
-    # load translations and set locale
-    locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)),
-                               'locales')
-    processor.load_translations(locales_dir)
-    locale = global_config.get('service', 'lang')
-    processor.set_locale(locale)
-
     # process messages
     logging.debug("Processing mailbox ...")
 
@@ -206,41 +141,16 @@ def manage_subscriptions_and_feeds_list(global_config):
         logging.debug("Closing IMAP mailbox ...")
         imap_conn.close()
 
-        # close smtp connection
-        processor.close_smtp()
-
         logging.debug("Logging out IMAP")
         imap_conn.logout()
 
 
-# main program
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(
-        description="Convert RSS to email and manage users subscriptions and "
-                    "feeds through email messages."
-    )
-    parser.add_argument('config', metavar='CONFIG',
-                        help="The configuration file")
-    parser.add_argument('-m', '--manage', dest='manage', action='store_true',
-                        help="Manage subscription of users")
-    parser.add_argument('-u', '--user', dest='user',
-                        help="Fetch and send all feeds of specified user")
-    parser.add_argument('-a', '--fetch-all', dest='fetch_all',
-                        action='store_true',
-                        help="Fetch and send all feeds of all users")
-    parser.add_argument('-l', '--list-subjects', dest='list_subjects',
-                        action='store_true',
-                        help="List managment message predefined subjects/"
-                             "actions translated")
-    args = parser.parse_args()
-
-    # get configuration
-    config = get_config(args.config)
+def setup_logging(_config):
+    """Setup the logging."""
 
     # set the log level and log format accordingly
-    log_level = config.get('log', 'level').upper()
-    log_format = config.get('log', 'format')
+    log_level = _config.get('log', 'level').upper()
+    log_format = _config.get('log', 'format')
     log_stream = sys.stdout
     if log_level == 'DEBUG':
         logging.basicConfig(stream=log_stream, level=logging.DEBUG, format=log_format)
@@ -275,50 +185,110 @@ if __name__ == '__main__':
                 "rss2email log format set to '%s'",
                 log_formatter._fmt) # pylint: disable=protected-access
 
+
+def setup_cli_args_parser():
+    """Setup Command Line arguments parser."""
+
+    parser = argparse.ArgumentParser(
+        description="Convert RSS to email and manage users subscriptions and "
+                    "feeds through email messages."
+    )
+    parser.add_argument('config', metavar='CONFIG',
+                        help="The configuration file")
+    parser.add_argument('-m', '--manage', dest='manage', action='store_true',
+                        help="Manage subscription of users")
+    parser.add_argument('-u', '--user', dest='user',
+                        help="Fetch and send all feeds of specified user")
+    parser.add_argument('-a', '--fetch-all', dest='fetch_all',
+                        action='store_true',
+                        help="Fetch and send all feeds of all users")
+    parser.add_argument('-l', '--list-subjects', dest='list_subjects',
+                        action='store_true',
+                        help="List managment message predefined subjects/"
+                             "actions translated")
+    return parser
+
+
+# main program
+if __name__ == '__main__':
+
+    # CLI
+    cli_parser = setup_cli_args_parser()
+    args = cli_parser.parse_args()
+
+    # get configuration
+    config = get_config(args.config)
+
+    # setup logging
+    setup_logging(config)
+
     logging.debug("Loaded configuration from file %s", args.config)
 
-    # fetch and send
-    if args.fetch_all or args.user:
-
-        logging.info("Fetching and sending feeds ...")
-        users = {}
-
-        data_dir = config.get('data', 'data_dir')
-        logging.debug("From data dir: '%s'", data_dir)
-
-        # all users
-        if args.fetch_all:
-
-            # for each user's dir
-            for d in os.listdir(data_dir):
-                d_path = os.path.join(data_dir, d)
-                if os.path.isdir(d_path) and '@' in d:
-                    users[d] = d_path
-
-        # one user
-        if args.user:
-
-            d_path = os.path.join(data_dir, args.user)
-            if os.path.isdir(d_path) and '@' in args.user:
-                users[args.user] = d_path
-            else:
-                logging.info("User '%s' not found", args.user)
-
-        # fetch and send
-        fetch_feeds_and_send_email(config, users)
-
-    # list subjects
-    elif args.list_subjects:
-
-        list_user_commands(config)
-
-    # management messages
-    elif args.manage:
-
-        manage_subscriptions_and_feeds_list(config)
-
     # no argument
-    else:
+    if not args.fetch_all and not args.user and not args.list_subjects and not args.manage:
 
         # display help message
-        parser.print_help()
+        cli_parser.print_help()
+        sys.exit(0)
+
+    # set config for processor module
+    processor.set_config(config)
+
+    # load translations and set locale
+    locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
+    processor.load_translations(locales_dir)
+    locale = config.get('service', 'lang')
+    processor.set_locale(locale)
+
+    # list subjects
+    if args.list_subjects:
+
+        list_user_commands()
+        sys.exit(0)
+
+    # initialize an smtp connection
+    if not processor.init_smtp():
+        sys.write("Failed to open an SMTP connection.\n")
+        sys.exit(1)
+
+    try:
+
+        # fetch and send
+        if args.fetch_all or args.user:
+
+            logging.info("Fetching and sending feeds ...")
+            users = {}
+
+            data_dir = config.get('data', 'data_dir')
+            logging.debug("From data dir: '%s'", data_dir)
+
+            # all users
+            if args.fetch_all:
+
+                # for each user's dir
+                for d in os.listdir(data_dir):
+                    d_path = os.path.join(data_dir, d)
+                    if os.path.isdir(d_path) and '@' in d:
+                        users[d] = d_path
+
+            # one user
+            if args.user:
+
+                d_path = os.path.join(data_dir, args.user)
+                if os.path.isdir(d_path) and '@' in args.user:
+                    users[args.user] = d_path
+                else:
+                    logging.info("User '%s' not found", args.user)
+
+            # fetch and send
+            fetch_feeds_and_send_email(config, users)
+
+        # management messages
+        elif args.manage:
+
+            manage_subscriptions_and_feeds_list(config)
+
+    finally:
+
+        # close smtp connection
+        processor.close_smtp()

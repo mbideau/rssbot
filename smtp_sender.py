@@ -17,7 +17,9 @@ def open_connection(hostname, port, username, password, ssl = False):
         port = int(hostname[pos+1:])
         hostname = hostname[:pos]
 
-    logging.debug("Openning SMTP connection to '%s:%s'", hostname, port)
+    logging.info(
+        "Establishing SMTP connection to '%s:%s' (ssl: %s) with "
+        "user '%s'", hostname, port, ssl, username)
     try:
         if ssl or (username or password):
             logging.debug("Creating SMTP SSL context")
@@ -28,17 +30,24 @@ def open_connection(hostname, port, username, password, ssl = False):
         else:
             logging.debug("Starting SMTP session (no SSL)")
             connection = smtplib.SMTP(host=hostname, port=port)
-    except KeyboardInterrupt: # pylint: disable=try-except-raise
-        raise
-    if username or password:
-        try:
+
+        if username or password:
             if not ssl:
                 logging.debug("Starting SMTP TLS session")
                 connection.starttls(context=context)
             logging.debug("Login SMTP with user '%s'", username)
             connection.login(username, password)
-        except KeyboardInterrupt: # pylint: disable=try-except-raise
-            raise
+
+    except KeyboardInterrupt:
+        logging.info("User interrupted the connection process")
+        return False
+
+    except smtplib.SMTPException as smtp_exc:
+        logging.error(
+            "Failed to connect to SMTP server '%s:%s' (ssl: %s) with "
+            "user '%s' (%s)", hostname, port, ssl, username, smtp_exc)
+        return False
+
     return connection
 
 
@@ -71,13 +80,17 @@ def build_html_plus_text_message(from_who, to_addrs, subject, text, html):
     return msg
 
 
-def send_message(conn, msg):
+def send_message(conn, msg, prefix='\t\t'):
     """Send the message through SMTP."""
-    logging.debug('Sending SMTP message ...')
+    logging.debug('Sending SMTP message')
+    msg_desc = (prefix +
+        '> ' + (msg['Subject'] if 'Subject' in msg else '(no subject)') +
+        ' -> ' + (msg['To'] if 'To' in msg else '(no recipient)'))
+    logging.info(msg_desc)
     conn.send_message(msg)
 
 
 def close_connection(conn):
     """Close the SMTP connection."""
-    logging.debug("Closing SMTP connection ...")
+    logging.info("Closing SMTP connection ...")
     conn.quit()

@@ -267,7 +267,7 @@ def rss2email_new_subscription(_email):
                   's' if number_of_feeds > 1 else '',
                   _email)
     if number_of_feeds:
-        raise RuntimeError(
+        raise ProcessorExc(
             "There should be no feed for a new subscription ! "
             f"Got '{number_of_feeds}' for user '{_email}'")
     feeds.config['DEFAULT']['to'] = _email
@@ -607,46 +607,105 @@ def handle_incoming_msg_error(exception, msg):
 ### Outgoing email processing functions ###
 ###########################################
 
-def send_mail(to_addrs, subject, text):
-    """Send an email to the recipient with the specified subject and text."""
-    global SMTP_CONNECTION # pylint: disable=global-variable-not-assigned
-    logging.debug("Message to send to '%s':\n-- %s\n%s", to_addrs, subject, text)
-    check_smtp()
-    from_bot = get_config().get('message', 'from')
-    msg = smtp_sender.build_text_message(from_bot, to_addrs, subject, text)
-    smtp_sender.send_message(SMTP_CONNECTION, msg)
-    logging.debug("Message sent")
+# override the feed send method to reuse the SMTP connexion
+def feed_send(self, sender, message): # pylint: disable=unused-argument
+    """Send an email containing the RSS content."""
+
+    # get the send protocol from rss2email configuration section
+    protocol = get_config().get('rss2email', 'email-protocol')
+    logging.debug('send %s message for %s', protocol, self)
+
+    # override only the SMTP protocol
+    if protocol == 'smtp':
+        send_message(message)
+
+    # else, use the rss2email 'send' implementation (LMTP, sendmail, etc.)
+    else:
+        section = self.section if self.section in self.config else 'DEFAULT'
+        rss_email.send(recipient=self.to, message=message, config=self.config,
+                       section=section)
 
 
-# used by 'rssbot.feed_send' function overriding the send method in rss2email's feed
-def send_message(recipient, msg, from_bot=None):
+# used by 'feed_send' function overriding the send method in rss2email's feed
+def send_message(msg):
     """Send an email message to the recipient."""
+
     global SMTP_CONNECTION # pylint: disable=global-variable-not-assigned
-    logging.debug("Message to send to '%s'", recipient)
+
+    if 'To' in msg:
+        logging.debug("Message to send to '%s'", msg['To'])
+    else:
+        logging.debug("Message to send")
+
+    # ensure SMTP connexion has been established
     check_smtp()
-    if from_bot is None:
-        if get_config() is None:
-            raise Exception( # pylint: disable=broad-exception-raised
-                "No 'from' parameter and empty 'config' for Processor instance")
-        from_bot = get_config().get('message', 'from')
+
+    # # get the sender email address
+    # try:
+    #     from_bot = get_config().get('message', 'from')
+    # except Exception as exc:
+    #     logging.error("Failed to get 'message.from' value from configuration.")
+    #     raise ProcessorExc(str(exc)) from exc
+
+    # send the message through SMTP
     try:
-        SMTP_CONNECTION.send_message(msg, from_bot, recipient.split(','))
+        #SMTP_CONNECTION.send_message(msg, from_bot, recipient.split(','))
+        smtp_sender.send_message(SMTP_CONNECTION, msg)
         logging.debug("Message sent")
-    except smtplib.SMTPDataError as exc:
-        logging.error("\t\tFailed to send message to '%s' (from: %s): %s",
-                      recipient, from_bot, exc)
+
+    # in case of SMTP disconnection
     except smtplib.SMTPServerDisconnected as exc:
-        logging.error("\t\tFailed to send message to '%s' (from: %s): %s",
-                      recipient, from_bot, exc)
-        logging.error("\t\tMore detail: msg = %s", msg)
+        logging.debug("\t\tFailed to send message: %s", exc)
+        logging.info("\t\tGot disconnected from SMTP ...")
+
+        # reconnect and try again to send the message
+        logging.info("\t\tReconnecting to SMTP ...")
+        try:
+            init_smtp()
+            #SMTP_CONNECTION.send_message(msg, from_bot, recipient.split(','))
+            smtp_sender.send_message(SMTP_CONNECTION, msg)
+            logging.debug("Message sent")
+
+        # in case of any new exception
+        except Exception as exc_sub:
+            logging.error("\t\tFailed to send message: %s", exc)
+            for key in ['From', 'To', 'Return-path']:
+                if key in msg:
+                    logging.error("\t\tMore detail: msg[%s] = '%s'", key, msg[key])
+            logging.error("\t\tMore detail: msg = %s", msg)
+
+            # raise a processor SMTP exception
+            raise ProcessorSMTPExc(
+                f"Got an exception '{exc_sub}' while reconnecting to SMTP "
+                "and sending again the message") from exc_sub
+
+    except (smtplib.SMTPDataError, smtplib.SMTPException) as exc:
+        logging.error("\t\tFailed to send message: %s", exc)
         for key in ['From', 'To', 'Return-path']:
             if key in msg:
                 logging.error("\t\tMore detail: msg[%s] = '%s'", key, msg[key])
-        # TODO: implements
-        # logging.info("\t\treconnecting to SMTP ...")
+        logging.error("\t\tMore detail: msg = %s", msg)
+        raise ProcessorSMTPExc(
+                f"Got an exception '{exc}' while sending the message") from exc
 
 
-# fake to debug
+# convenient method to send a mail with text/plain format
+def send_mail(to_addrs, subject, text):
+    """Send an email to the recipient with the specified subject and text."""
+
+    logging.debug("Message to send to '%s':\n-- %s\n%s", to_addrs, subject, text)
+
+    # get the sender email address
+    from_bot = get_config().get('message', 'from')
+
+    # build the message with the text/plain format
+    msg = smtp_sender.build_text_message(from_bot, to_addrs, subject, text)
+
+    # send the message
+    send_message(msg)
+
+
+# fake to debug # TODO remove
 def send_mail_debug(_, subject, text):
     """Faking to send an email."""
     logging.debug("Message to send:\n-- %s\n%s", subject, text)
@@ -783,6 +842,7 @@ def msg_add_unsubscribe(feed, parsed, entry, guid, message): # pylint: disable=u
     return message
 
 
+# used by rss2email before sending the mail/message
 def msg_post_process(feed, parsed, entry, guid, message):
     """Post processing of the email message before they are sent."""
     message = msg_pretty(feed, parsed, entry, guid, message)
@@ -798,54 +858,33 @@ def check_smtp():
     """Raise an error if there is not global SMTP connection defined."""
     global SMTP_CONNECTION # pylint: disable=global-variable-not-assigned
     if not SMTP_CONNECTION:
-        raise RuntimeError("You must init an SMTP connection with init_smtp() "
+        raise ProcessorExc("You must init an SMTP connection with init_smtp() "
                            "before processing messages")
 
 
-def init_smtp(hostname=None, port=None, username=None, password=None, ssl=None):
-    """Establish an SMTP connection."""
+def init_smtp():
+    """Establish an SMTP connection using configured parameters."""
     global SMTP_CONNECTION # pylint: disable=global-statement
-    if not SMTP_CONNECTION:
-        if hostname is None:
-            hostname = get_config().get('smtp', 'hostname')
-        if port is None:
-            port = get_config().get('smtp', 'port')
-        if ssl is None:
-            ssl = get_config().getboolean('smtp', 'ssl', fallback=False)
-        if username is None:
-            username = get_config().get('account', 'username', fallback=None)
-        if password is None:
-            password = get_config().get('account', 'password', fallback=None)
 
-        # support for 'server:port'
-        pos = hostname.find(':')
-        if 0 <= pos:
-            # Strip port out of server name
-            port = int(hostname[pos+1:])
-            hostname = hostname[:pos]
+    hostname = get_config().get('smtp', 'hostname')
+    port = get_config().get('smtp', 'port')
+    ssl = get_config().getboolean('smtp', 'ssl', fallback=False)
+    username = get_config().get('account', 'username', fallback=None)
+    password = get_config().get('account', 'password', fallback=None)
 
-        try:
-            logging.info(
-                "Establishing SMTP connection to '%s:%s' (ssl: %s) with "
-                "user '%s'", hostname, port, ssl, username)
-            SMTP_CONNECTION = smtp_sender.open_connection(
-                hostname, port, username, password, ssl=ssl)
-            return SMTP_CONNECTION
-        except smtplib.SMTPException as smtp_exc:
-            logging.error(
-                "Failed to connect to SMTP server '%s:%s' (ssl: %s) with "
-                "user '%s' (%s)", hostname, port, ssl, username, smtp_exc)
-    return False
+    SMTP_CONNECTION = smtp_sender.open_connection(
+        hostname, port, username, password, ssl=ssl)
+    return SMTP_CONNECTION
+
 
 def close_smtp():
     """Close the global SMTP connection."""
-    global SMTP_CONNECTION # pylint: disable=global-statement
+    global SMTP_CONNECTION # pylint: disable=global-variable-not-assigned
     if SMTP_CONNECTION:
         try:
             smtp_sender.close_connection(SMTP_CONNECTION)
         except smtplib.SMTPServerDisconnected:
             pass
-    SMTP_CONNECTION = None
 
 
 #######################
@@ -875,3 +914,22 @@ def load_translations(path):
     """Load a translation file."""
     logging.debug("Loading translations from: '%s'", path)
     i18n.load_path.append(path)
+
+
+##################
+### Exceptions ###
+##################
+
+class ProcessorExc (Exception):
+    """A processor exception."""
+    def __init__(self, message):
+        super().__init__(message)
+
+    def log(self):
+        """Log the exception."""
+        logging.error(str(self))
+        if self.__cause__ is not None:
+            logging.error('cause: %s', self.__cause__)
+
+class ProcessorSMTPExc (ProcessorExc):
+    """A processor SMTP exception."""

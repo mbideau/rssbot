@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 from rss2email import feed as _feed # pylint: disable=import-error
 from rss2email import feeds as _feeds # pylint: disable=import-error
+from rss2email import email as rss_email # pylint: disable=import-error
 import i18n # pylint: disable=import-error
 
 import smtp_sender
@@ -27,6 +28,7 @@ for e in ['error', 'herror', 'gaierror']:
         _SOCKET_ERRORS.append(getattr(_socket, e))
 del e  # cleanup namespace
 _SOCKET_ERRORS = tuple(_SOCKET_ERRORS)
+import xml.etree.ElementTree as ET # pylint: disable=wrong-import-order,wrong-import-position
 import xml.sax as _sax # pylint: disable=wrong-import-order,wrong-import-position
 import feedparser as _feedparser # pylint: disable=import-error,wrong-import-order,wrong-import-position
 _feedparser.PREFERRED_XML_PARSERS = []
@@ -648,6 +650,144 @@ def send_message(recipient, msg, from_bot=None):
 def send_mail_debug(_, subject, text):
     """Faking to send an email."""
     logging.debug("Message to send:\n-- %s\n%s", subject, text)
+
+
+# from: https://github.com/rss2email/rss2email/blob/master/rss2email/post_process/prettify.py
+def msg_pretty(feed, parsed, entry, guid, message): # pylint: disable=unused-argument
+    """Use BeautifulSoup to pretty-print the html
+
+    A very simple function that decodes the entry into a unicode
+    string and then calls BeautifulSoup on it and afterwards encodes
+    the feed entry
+    """
+    logging.debug("Prettifying the message content ...")
+    # decode message
+    logging.debug("Getting encoding of the message")
+    encoding = message.get_charsets()[0]
+    logging.debug("Encoding of the message: %s", encoding)
+    logging.debug("Getting content of the message")
+    content = str(message.get_payload(decode=True), encoding)
+    logging.debug("Content of the message: %s", content)
+
+    # modify content
+    logging.debug("Prettifying content of the message")
+    soup = BeautifulSoup(content, features="html.parser")
+    content = soup.prettify()
+    logging.debug("Prettified content of the message")
+
+    # BeautifulSoup uses unicode, so we perhaps have to adjust the encoding.
+    # It's easy to get into encoding problems and this step will prevent
+    # them ;)
+    logging.debug("Getting new encoding of the message")
+    encoding = rss_email.guess_encoding(content, encodings=feed.encodings)
+    logging.debug("Encoding of the message: %s", encoding)
+
+    logging.debug("Prettifyed the message content")
+    # clear CTE and set message. It can be important to clear the CTE
+    # before setting the payload, since the payload is only re-encoded
+    # if CTE is not already set.
+    del message['Content-Transfer-Encoding']
+    message.set_payload(content, charset=encoding)
+    return message
+
+
+def msg_add_unsubscribe(feed, parsed, entry, guid, message): # pylint: disable=unused-argument,too-many-statements,too-many-locals
+    """Add a link to unsubscribe to the service."""
+    logging.debug("Adding unsubscribe text to the message content ...")
+
+    # decode message
+    logging.debug("Getting encoding of the message")
+    encoding = message.get_charsets()[0]
+    logging.debug("Encoding of the message: %s", encoding)
+    logging.debug("Getting content of the message")
+    content = str(message.get_payload(decode=True), encoding)
+    #logging.debug("Content of the message: %s", content)
+
+    logging.debug("Getting data for the message additions")
+    service_mail = get_config().get('service', 'mail')
+    service_name = get_config().get('service', 'name')
+    unsubscribe_action = i18n.t('rssbot.unsubscribe')
+    logging.debug("Build the message additions")
+    unsub_content = i18n.t('rssbot.unsubscribe_msg', service=service_name,
+                            mail=service_mail, unsubscribe=unsubscribe_action)
+    logging.debug("Text to add: %s", unsub_content)
+
+    # if we send HTML messages
+    if feed.html_mail:
+        logging.debug("Mail message is in the HTML format")
+
+        # turn HTML message into XML
+        logging.debug("Parsing HTML content")
+        xmlroot = ET.fromstring(content)
+
+        # create a new node element
+        logging.debug("Creating a new paragraphe element")
+        p_elt = ET.Element('p')
+        p_elt.text = unsub_content
+
+        # search for a "footer" node
+        logging.debug("Search for the footer node")
+        footer_node = None
+        footer_nodes = xmlroot.findall(".//div[@class='footer']")
+        if len(footer_nodes) > 0:
+            footer_node = footer_nodes[-1]
+            logging.debug("Found footer node")
+
+        # node not found
+        if not footer_node:
+            logging.debug("Footer node not found")
+
+            # get the body node
+            logging.debug("Search for the body node")
+            body_node = None
+            body_nodes = xmlroot.findall("./html/body")
+            if len(body_nodes) == 0:
+                raise Exception("No nody node !") # pylint: disable=broad-exception-raised
+            if len(body_nodes) > 0:
+                body_node = body_nodes[-1]
+                logging.debug("Found body node")
+
+            # add the footer node to it
+            logging.debug("Adding footer node to body node")
+            div_elt = ET.Element('div')
+            div_elt.set('class', 'footer')
+            body_node.append(div_elt)
+            logging.debug("Footer node added")
+            footer_node = div_elt
+
+        # add new element to footer node
+        logging.debug("Adding paragraphe node to footer node")
+        footer_node.append(p_elt)
+
+        # replacing content
+        logging.debug("Turning XML tree into a string")
+        xml_content = ET.tostring(xmlroot, encoding=encoding)
+        logging.debug("Setting this string as the mail message content")
+        content = xml_content
+        logging.debug("New content of the message: %s", content)
+
+    # no HTML
+    else:
+        logging.debug("Mail message is in the text/plain format")
+
+        # modify content
+        logging.debug("Text added: %s", unsub_content)
+        content += '\n\n---\n' + unsub_content
+
+    logging.debug("Added unsubscribe text to the message content ...")
+    # clear CTE and set message. It can be important to clear the CTE
+    # before setting the payload, since the payload is only re-encoded
+    # if CTE is not already set.
+    del message['Content-Transfer-Encoding']
+    message.set_payload(content, charset=encoding)
+    return message
+
+
+def msg_post_process(feed, parsed, entry, guid, message):
+    """Post processing of the email message before they are sent."""
+    message = msg_pretty(feed, parsed, entry, guid, message)
+    message = msg_add_unsubscribe(feed, parsed, entry, guid, message)
+    return message
 
 
 ######################

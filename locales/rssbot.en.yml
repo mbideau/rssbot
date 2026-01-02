@@ -28,3 +28,5 @@ en:
   add_help: "add a feed source URL to your feed list (just put the URL in the email content)"
   delete_help: "delete a feed source URL from your feed list (just put the URL in the email content)"
   list_help: "list all your feeds sources"
+
+  unsubscribe_msg: "This message have been sent to you because you have subscribed to the service '%{service}'. To unsubscribe (and remove all your data), sent an email to %{mail} with subject: '%{unsubscribe}'."

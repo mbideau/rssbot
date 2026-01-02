@@ -49,6 +49,15 @@ def feed_send(self, sender, message): # pylint: disable=unused-argument
 def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-many-locals
     """Fetch user's feeds and send them by email."""
 
+    # set config for processor module
+    processor.set_config(global_config)
+
+    # load translations and set locale
+    locales_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), 'locales')
+    processor.load_translations(locales_dir)
+    locale = global_config.get('service', 'lang')
+    processor.set_locale(locale)
+
     # for each user
     for user, udir in _users.items(): # pylint: disable=too-many-nested-blocks
         logging.info("\tUser: %s (%s)", user, udir)
@@ -77,6 +86,9 @@ def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-man
                 save_feeds = True
                 for feed in feeds:
                     if feed.active:
+                        # add a post processing function
+                        feed.post_process = processor.msg_post_process
+
                         # override the send method (local to the object)
                         # to reuse SMTP connection
                         # pylint: disable=protected-access

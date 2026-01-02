@@ -28,3 +28,5 @@ fr:
   add_help: "ajouter l'URL source d'un flux à votre liste de flux (renseignez simplement l'URL dans le corps du mail)"
   delete_help: "supprimer l'URL source d'un flux de votre liste de flux (renseignez simplement l'URL dans le corps du mail)"
   list_help: "lister toutes les sources de vos flux"
+
+  unsubscribe_msg: "Ce message vous a été envoyé car vous êtes inscrit au service '%{service}'. Pour vous désinscrire (et supprimer toutes vos données), envoyez un email à %{mail} avec en objet: '%{unsubscribe}'."

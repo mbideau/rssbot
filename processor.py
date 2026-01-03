@@ -566,20 +566,23 @@ def check_for_feed_errors(parsed): # pylint: disable=too-many-branches
 
 def handle_incoming_msg_error(exception, msg):
     """Handle an incoming message error by sending a feedback email to the user."""
-    logging.error("Catched an exception (program have aborted): %s", exception)
+    exc_name = type(exception).__name__
+    logging.error("Catched an exception (program have aborted) %s %s",
+                  exc_name, exception)
     _email = None
 
     try:
         _, _email, subject, _, feed = parse_message(msg)
         response = i18n.t('rssbot.error_exception',
-            error=type(exception).__name__,
+            error=exc_name,
+            detail=str(exception),
             message=subject + (' (' + feed + ')' if feed else ''),
             admin=get_config().get('service', 'admin')
         )
         subject = "Re: " + subject
 
-    except Exception as inner_exception: # pylint: disable=broad-exception-caught
-        logging.error("Catched an inner exception: %s", inner_exception)
+    except Exception as exc_sub: # pylint: disable=broad-exception-caught
+        logging.error("Catched an inner exception: %s %s", type(exc_sub).__name__, exc_sub)
         try:
             _email = get_email_sender(msg)
             subject = "Error"
@@ -589,14 +592,14 @@ def handle_incoming_msg_error(exception, msg):
             response = i18n.t('rssbot.error_exception_fallback',
                               admin=get_config().get('service', 'admin'),
                               message=str(msg))
-        except Exception as inner_inner_exception: # pylint: disable=broad-exception-caught
-            logging.error("Catched an inner inner exception: %s", inner_inner_exception)
+        except Exception as exc_sub_2: # pylint: disable=broad-exception-caught
+            logging.error("Catched an inner exception: %s %s", type(exc_sub_2).__name__, exc_sub_2)
 
     if _email and subject and response:
         try:
             send_mail(_email, subject, response)
-        except Exception as inner_exception: # pylint: disable=broad-exception-caught
-            logging.error("Catched an inner exception: %s", inner_exception)
+        except Exception as exc_sub: # pylint: disable=broad-exception-caught
+            logging.error("Catched an inner exception: %s %s", type(exc_sub).__name__, exc_sub)
     else:
         logging.error(
             "Cannot send email back to user. Details: email='%s', "
@@ -654,8 +657,26 @@ def send_message(msg):
         logging.debug("Message sent")
 
     # in case of SMTP disconnection
-    except smtplib.SMTPServerDisconnected as exc:
-        logging.debug("\t\tFailed to send message: %s", exc)
+    except (smtplib.SMTPServerDisconnected,smtplib.SMTPSenderRefused) as exc:
+        exc_name = type(exc).__name__
+        logging.debug("\t\tFailed to send message: %s %s", exc_name, exc)
+
+        # that's a SenderRefused error but not a timeout: bad catch
+        if (exc_name == 'SMTPSenderRefused' and
+                not exc.smtp_error.decode().endswith('Error: timeout exceeded')):
+            logging.error("SMTPSenderRefused.smtp_error: '%s'", exc.smtp_error.decode())
+
+            # log more info
+            for key in ['From', 'To', 'Return-path']:
+                if key in msg:
+                    logging.error("\t\tMore detail: msg[%s] = '%s'", key, msg[key])
+            logging.error("\t\tMore detail: msg = %s", msg)
+
+            # re-raise the error
+            raise ProcessorSMTPExc(
+                    f"Got an exception {exc_name} ({exc}) while sending the message") from exc
+
+        # else, its is a disconnection (by timeout)
         logging.info("\t\tGot disconnected from SMTP ...")
 
         # reconnect and try again to send the message
@@ -668,7 +689,7 @@ def send_message(msg):
 
         # in case of any new exception
         except Exception as exc_sub:
-            logging.error("\t\tFailed to send message: %s", exc)
+            logging.error("\t\tFailed to send message: %s %s", type(exc_sub).__name__, exc_sub)
             for key in ['From', 'To', 'Return-path']:
                 if key in msg:
                     logging.error("\t\tMore detail: msg[%s] = '%s'", key, msg[key])
@@ -680,13 +701,14 @@ def send_message(msg):
                 "and sending again the message") from exc_sub
 
     except (smtplib.SMTPDataError, smtplib.SMTPException) as exc:
-        logging.error("\t\tFailed to send message: %s", exc)
+        exc_name = type(exc).__name__
+        logging.error("\t\tFailed to send message: %s %s", exc_name, exc)
         for key in ['From', 'To', 'Return-path']:
             if key in msg:
                 logging.error("\t\tMore detail: msg[%s] = '%s'", key, msg[key])
         logging.error("\t\tMore detail: msg = %s", msg)
         raise ProcessorSMTPExc(
-                f"Got an exception '{exc}' while sending the message") from exc
+                f"Got an exception {exc_name} ({exc}) while sending the message") from exc
 
 
 # convenient method to send a mail with text/plain format

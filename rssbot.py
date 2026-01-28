@@ -7,11 +7,12 @@ import configparser
 import os
 import logging
 import sys
-import time
+import traceback
 import types
 
 from rss2email import config as _config # pylint: disable=import-error
 from rss2email import feeds as _feeds # pylint: disable=import-error
+from rss2email import error as _error # pylint: disable=import-error
 
 import processor
 import imap_reader
@@ -68,10 +69,14 @@ def fetch_feeds_and_send_email(global_config, _users): # pylint: disable=too-man
                             type(exc).__name__, exc)
                         save_feeds = False
                         break
-                    except Exception as exc: # pylint: disable=broad-exception-caught
+                    except (_error.TimeoutError,_error.HTTPError) as exc:
                         logging.error(
                             "\t\tCatched an '%s' exception: %s",
                             type(exc).__name__, exc)
+                    except Exception as exc: # pylint: disable=broad-exception-caught
+                        logging.error(
+                            "\t\tCatched an '%s' exception: %s. Trace: %s",
+                            type(exc).__name__, exc, traceback.format_exc())
             if save_feeds:
                 logging.info("\t\tSaving feeds ...")
                 feeds.save_feeds()

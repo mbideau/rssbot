@@ -620,6 +620,11 @@ def feed_send(self, sender, message): # pylint: disable=unused-argument
 
     # override only the SMTP protocol
     if protocol == 'smtp':
+
+        # fix 'From' header (i.e.: prevent 'Sender Mismatch' error)
+        msg_fix_from_header(message)
+
+        # send the message
         send_message(message)
 
     # else, use the rss2email 'send' implementation (LMTP, sendmail, etc.)
@@ -627,6 +632,86 @@ def feed_send(self, sender, message): # pylint: disable=unused-argument
         section = self.section if self.section in self.config else 'DEFAULT'
         rss_email.send(recipient=self.to, message=message, config=self.config,
                        section=section)
+
+def msg_fix_from_header(msg):
+    """Ensure the 'From' header is defined and contains only the RSS bot email,
+    and is in quoted-printable format"""
+
+    if 'From' in msg:
+
+        # ensure the From header contains only the RSS bot email
+        # (remove other email addresses)
+        from_str = str(email.header.make_header(email.header.decode_header(
+            msg['From'])))
+        email_detected = re.search(r':?\s*<([^>]+)>', from_str)
+        if email_detected:
+            logging.info("email detected in msg From '%s'", from_str)
+            whole_match = email_detected.group(0)
+            email_match = email_detected.group(1)
+            logging.info("email detected is '%s'", email_match)
+            from_bot = get_config().get('message', 'from')
+            if email_match != from_bot:
+                logging.info("email detected is different from the RSS bot")
+                from_without_email = from_str.replace(whole_match, '')
+                logging.info("replacing msg From '%s' by '%s'",
+                                from_str, from_without_email)
+                msg_header_from = email.header.Header(from_without_email)
+                msg.replace_header('From', msg_header_from)
+                logging.info("replaced msg From header")
+
+        # ensure the From header contains the RSS bot email
+        # (add it if absent)
+        from_str = str(email.header.make_header(email.header.decode_header(
+            msg['From']))).strip()
+        email_detected = re.search(r':?\s*<([^>]+)>', from_str)
+        if not email_detected:
+            logging.info("no email detected in msg From '%s'", from_str)
+            from_bot = get_config().get('message', 'from')
+            from_with_email = f'"{from_str}" <{from_bot}>'
+            if from_str.startswith('"') and from_str.endswith('"'):
+                from_with_email = f'{from_str} <{from_bot}>'
+            logging.info("replacing msg From '%s' by '%s'",
+                            from_str, from_with_email)
+            msg_header_from = email.header.Header(from_with_email)
+            msg.replace_header('From', msg_header_from)
+            logging.info("replaced msg From header")
+
+        # ensure the From header contains the non-email part in quotes
+        else:
+            whole_match = email_detected.group(0)
+            from_without_email = from_str.replace(whole_match, '').strip()
+            if not from_str.startswith('"') and not from_str.endswith('"'):
+                logging.info("email miss quotes in msg From '%s'", from_str)
+                from_bot = get_config().get('message', 'from')
+                from_with_email = f'"{from_without_email}" <{from_bot}>'
+                logging.info("replacing msg From '%s' by '%s'",
+                                from_str, from_with_email)
+                msg_header_from = email.header.Header(from_with_email)
+                msg.replace_header('From', msg_header_from)
+                logging.info("replaced msg From header")
+
+    # ensure there is a From item
+    if 'From' not in msg:
+        logging.info("no 'From' detected in msg")
+        from_name = get_config().get('service', 'name')
+        from_email = get_config().get('message', 'from')
+        from_with_email = f'"{from_name}" <{from_email}>'
+        logging.info("adding From header: '%s'", from_with_email)
+        msg_header_from = email.header.Header(from_with_email)
+        msg.append_header('From', msg_header_from)
+        logging.info("added msg From header")
+
+    # ensure the From header is in us-ascii charset
+    from_str = str(email.header.make_header(email.header.decode_header(
+        msg['From'])))
+    from_str_ascii = from_str.encode('ascii', 'backslashreplace')
+    if from_str_ascii != from_str:
+        logging.info("the 'From' header is not in us-ascii format")
+        logging.info("replacing msg From '%s' by '%s'",
+                        from_str, from_str_ascii)
+        msg_header_from = email.header.Header(from_str_ascii)
+        msg.replace_header('From', msg_header_from)
+        logging.info("replaced msg From header")
 
 
 # used by 'feed_send' function overriding the send method in rss2email's feed

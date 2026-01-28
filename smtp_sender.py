@@ -84,8 +84,9 @@ def send_message(conn, msg, prefix='\t\t'):
     """Send the message through SMTP."""
     logging.debug('Sending SMTP message')
     msg_desc = (prefix +
-        '> ' + (msg['Subject'] if 'Subject' in msg else '(no subject)') +
-        ' -> ' + (msg['To'] if 'To' in msg else '(no recipient)'))
+        '> ' + (str(msg['Subject']) if 'Subject' in msg else '(no subject)') +
+        ' -> ' + (str(msg['To']) if 'To' in msg else '(no recipient)') +
+        ((' (' + str(msg['From']) + ')') if 'From' in msg else ''))
     logging.info(msg_desc)
     conn.send_message(msg)
 

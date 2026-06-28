@@ -792,6 +792,12 @@ def send_message(msg):
             if key in msg:
                 logging.error("\t\tMore detail: msg[%s] = '%s'", key, msg[key])
         logging.error("\t\tMore detail: msg = %s", msg)
+        # in case of being detected as a SPAM, just error out, then continue
+        logging.error("\t\tException decoded: '%s'", exc.smtp_error.decode())
+        if exc.smtp_error.decode().endswith("Spam message rejected"):
+            logging.error("\t\tMessage detected as SPAM, continuing ...")
+            return
+        # else raise an exception
         raise ProcessorSMTPExc(
                 f"Got an exception {exc_name} ({exc}) while sending the message") from exc
 
